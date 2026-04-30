@@ -140,6 +140,10 @@ export function buildChapterListRebuildContainer(snapshot: AppSnapshot, nav: any
   const entries = getChapterListEntries(snapshot, nav)
   const names = entries.map((e) => e.label)
 
+  if (names.length === 0) {
+    names.push('No chapters')
+  }
+
   const list = new ListContainerProperty({
     xPosition: 10,
     yPosition: 10,

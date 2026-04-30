@@ -4,6 +4,7 @@ import { RebuildPageContainer, ListContainerProperty, ListItemContainerProperty,
 import { DISPLAY_W, DISPLAY_H } from 'even-toolkit/layout'
 
 const MAX_BUTTON_LABEL_LENGTH = 60
+const MAX_LIST_ITEMS = 20
 
 function truncateLabel(label: string, maxLength: number) {
   if (label.length <= maxLength) {
@@ -44,7 +45,13 @@ export const homeScreen: any = {
 
 export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, containerID = 1) {
   const buttons = snapshot?.buttons ?? []
-  const names = buttons.map((b) => truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH))
+  const names = buttons
+    .slice(0, MAX_LIST_ITEMS)
+    .map((b) => truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH))
+
+  if (names.length === 0) {
+    names.push('No novels')
+  }
 
   const list = new ListContainerProperty({
     xPosition: 10,
