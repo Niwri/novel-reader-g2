@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { waitForEvenAppBridge, CreateStartUpPageContainer, type EvenAppBridge } from '@evenrealities/even_hub_sdk'
+import { waitForEvenAppBridge, CreateStartUpPageContainer, type EvenAppBridge, TextContainerProperty } from '@evenrealities/even_hub_sdk'
 import { mapGlassEvent } from 'even-toolkit/action-map'
 import { createScreenMapper } from 'even-toolkit/glass-router'
 import { notifyTextUpdate } from 'even-toolkit/gestures'
@@ -187,8 +187,11 @@ export function AppGlasses() {
     selectNovel: async (index: number) => {
       const novel = novels[index]
       if (!novel) return
-      await setSelectedNovel(novel)
-      const chapters = await getChapterList(novel.epubBlob as Blob)
+      const resolved = await setSelectedNovel(novel)
+      if (!resolved.epubBlob) {
+        throw new Error('Selected novel is missing epubBlob')
+      }
+      const chapters = await getChapterList(resolved.epubBlob)
       await setChapterList(chapters)
     },
     selectChapter: async (index: number) => {
@@ -219,10 +222,11 @@ export function AppGlasses() {
 
   const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
-  async function waitForLoaded(timeoutMs = 1000, interval = 50): Promise<boolean> {
+  async function waitForLoaded(timeoutMs = 0, interval = 50, shouldAbort?: () => boolean): Promise<boolean> {
     const start = Date.now()
     while (!loadedRef.current) {
-      if (Date.now() - start > timeoutMs) return false
+      if (shouldAbort?.()) return false
+      if (timeoutMs > 0 && Date.now() - start > timeoutMs) return false
       await sleep(interval)
     }
 
@@ -310,23 +314,43 @@ export function AppGlasses() {
         bridgeRef.current = bridge
 
         // Startup must begin with the home page (using the same data model as rebuild).
+        // Loading page
+        await bridge.createStartUpPageContainer(
+          new CreateStartUpPageContainer({
+            containerTotalNum: 1,
+            listObject: [],
+            textObject: [
+              new TextContainerProperty({
+                xPosition: DISPLAY_W/2 - 5*10,
+                yPosition: DISPLAY_H/2-25,
+                width: 100,
+                height: 50,
+                containerID: 1,
+                containerName: 'loading',
+                content: 'Loading...',
+                isEventCapture: 0
+              })
+            ],
+            imageObject: [],
+          }),
+        )
+
+        // Create a polling function waiting for 'loaded' to be true, then continue
+        await waitForLoaded(0, 50, () => disposed)
+        if (disposed) return
+
         const startupNav: GlassNavState = { highlightedIndex: 0, screen: 'home' }
         navRef.current = startupNav
         const startupSnap = getSnapshotForScreenRef.current('home')
         const startupRebuild = buildRebuildContainerForScreen('home', startupSnap, startupNav)
-
-        await bridge.createStartUpPageContainer(
-          new CreateStartUpPageContainer({
-            containerTotalNum: startupRebuild?.containerTotalNum ?? 1,
-            listObject: startupRebuild?.listObject ?? [],
-            textObject: startupRebuild?.textObject ?? [],
-            imageObject: startupRebuild?.imageObject ?? [],
-          }),
-        )
-
+        
         lastRenderedRef.current = {
           screen: 'home',
           content: startupRebuild ? getRebuildSignature(startupRebuild) : '',
+        }
+
+        if (startupRebuild) {
+          await bridge.rebuildPageContainer(startupRebuild)
         }
 
         unsubscribe = bridge.onEvenHubEvent((event) => {
@@ -342,8 +366,6 @@ export function AppGlasses() {
         unbindKeyboard = bindKeyboard(dispatchAction)
         activateKeepAlive('Novel Reader_direct_bridge')
 
-        // Switch to the actual current route screen.
-        await waitForLoaded(1000)
         scheduleRender()
       } catch (err) {
         console.error('AppGlasses EvenAppBridge init error:', err)

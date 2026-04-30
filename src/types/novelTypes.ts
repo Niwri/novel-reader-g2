@@ -3,7 +3,7 @@ export interface Novel {
     title: string; 
     author: string;
     coverImage: string | null;     // Base64 or Object URL 
-    epubBlob: Blob;         // Raw EPUB file
+    epubBlob?: Blob;         // Raw EPUB file (loaded lazily on glasses)
     cfi?: string;           // EPUB CFI location
     lastReadAt?: Date;
     archived?: boolean

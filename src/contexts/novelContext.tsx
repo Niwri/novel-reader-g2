@@ -1,5 +1,5 @@
 import { useState, useEffect, useReducer, createContext, useContext, type ReactNode } from 'react'
-import { getAllNovels, saveNovel, deleteNovel } from '../lib/db'
+import { getAllNovels, getNovelBlob, saveNovel, deleteNovel } from '../lib/db'
 import type { ChapterContent, Novel } from '../types/novelTypes'
 
 // --- States ---
@@ -27,7 +27,7 @@ interface NovelContextValue {
     selectedChapterList: ChapterContent[]
     selectedChapterIndex: number
     loaded: boolean
-    setSelectedNovel: (novel: Novel) => Promise<void>
+    setSelectedNovel: (novel: Novel) => Promise<Novel>
     addNovel: (novel: Novel) => Promise<void>
     removeNovel: (novel: Novel) => Promise<void>
     updateNovel: (novel: Novel) => Promise<void>
@@ -86,7 +86,20 @@ export function NovelProvider({children}: {children: ReactNode}) {
         selectedChapterList: state.selectedChapterList,
         selectedChapterIndex: state.selectedChapterIndex,
         loaded: loaded,
-        setSelectedNovel: async (novel) => dispatch({ type: 'SET_SELECTED', selectedNovel: novel}),
+        setSelectedNovel: async (novel) => {
+            let resolved: Novel = novel
+            if (!resolved.epubBlob) {
+                const blob = await getNovelBlob(resolved.id)
+                if (!blob) {
+                    throw new Error('Missing EPUB blob for selected novel')
+                }
+                resolved = { ...resolved, epubBlob: blob }
+                dispatch({ type: 'UPDATE', novel: resolved })
+            }
+
+            dispatch({ type: 'SET_SELECTED', selectedNovel: resolved })
+            return resolved
+        },
         addNovel: async (novel) => {
             dispatch({ type: 'ADD', novel })
             try {

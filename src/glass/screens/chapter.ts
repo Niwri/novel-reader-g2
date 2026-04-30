@@ -321,6 +321,11 @@ export const chapterScreen: any = {
 
     if (action.type === 'SELECT_HIGHLIGHTED') {
       advanceToNextChapter(snapshot, ctx)
+      return {
+        ...nav,
+        chapterScrollOffset: 0,
+        chapterEndAttempts: 0,
+      }
     }
 
     if (action.type === 'GO_BACK') {
