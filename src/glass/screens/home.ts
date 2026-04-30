@@ -1,7 +1,7 @@
-import type { GlassScreen } from 'even-toolkit/glass-screen-router'
-import { buildScrollableList } from 'even-toolkit/glass-display-builders'
 import { moveHighlight } from 'even-toolkit/glass-nav'
 import type { AppSnapshot, AppActions } from '../shared'
+import { RebuildPageContainer, ListContainerProperty, ListItemContainerProperty, TextContainerProperty } from '@evenrealities/even_hub_sdk'
+import { DISPLAY_W, DISPLAY_H } from 'even-toolkit/layout'
 
 const MAX_BUTTON_LABEL_LENGTH = 60
 
@@ -13,19 +13,12 @@ function truncateLabel(label: string, maxLength: number) {
   return `${label.slice(0, Math.max(1, maxLength - 1))}…`
 }
 
-export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
-  display(snapshot, nav) {
-    return {
-      lines: buildScrollableList({
-        items: snapshot?.buttons ?? [],
-        highlightedIndex: nav.highlightedIndex,
-        maxVisible: 5,
-        formatter: (item) => truncateLabel(item.label, MAX_BUTTON_LABEL_LENGTH),
-      }),
-    }
+export const homeScreen: any = {
+  display(snapshot: AppSnapshot, nav: any) {
+    return buildHomeRebuildContainer(snapshot, nav)
   },
 
-  action(action, nav, snapshot, ctx) {
+  action(action: any, nav: any, snapshot: AppSnapshot, ctx: AppActions) {
     if (action.type === 'HIGHLIGHT_MOVE') {
       const maxHighlightIndex = Math.max((snapshot?.buttons?.length ?? 0) - 1, 0)
 
@@ -47,4 +40,32 @@ export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
 
     return nav
   },
+}
+
+export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, containerID = 1) {
+  const buttons = snapshot?.buttons ?? []
+  const names = buttons.map((b) => truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH))
+
+  const list = new ListContainerProperty({
+    xPosition: 10,
+    yPosition: 10,
+    width: DISPLAY_W - 20,
+    height: DISPLAY_H - 20,
+    containerID,
+    containerName: 'home-list',
+    itemContainer: new ListItemContainerProperty({
+      itemCount: names.length,
+      itemWidth: 0,
+      isItemSelectBorderEn: 1,
+      itemName: names,
+    }),
+    isEventCapture: 1,
+  })
+
+  return new RebuildPageContainer({
+    containerTotalNum: 1,
+    listObject: [list],
+    textObject: [],
+    imageObject: [],
+  })
 }

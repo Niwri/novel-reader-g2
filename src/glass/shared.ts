@@ -8,6 +8,8 @@ export interface AppSnapshot {
   buttons?: AppButton[]
   title?: string
   texts?: string[]
+  chapterIndex?: number
+  chapterCount?: number
   flashPhase: boolean
 }
 
