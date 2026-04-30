@@ -31,8 +31,8 @@ interface NovelContextValue {
     addNovel: (novel: Novel) => Promise<void>
     removeNovel: (novel: Novel) => Promise<void>
     updateNovel: (novel: Novel) => Promise<void>
-    setChapterList: (chapters: ChapterContent[]) => Promise<void>
-    setChapter: (chapterIndex: number) => Promise<void>
+    setChapterList: (chapters: ChapterContent[]) => void
+    setChapter: (chapterIndex: number) => void
 }
 const NovelContext = createContext<NovelContextValue | null>(null) 
 
@@ -114,10 +114,10 @@ export function NovelProvider({children}: {children: ReactNode}) {
                 throw e
             }
         },
-        setChapterList: async (chapterList) => {
+        setChapterList: (chapterList) => {
             dispatch({ type: 'SET_CHAPTERS', selectedChapterList: chapterList })
         },
-        setChapter: async (chapterIndex) => {
+        setChapter: (chapterIndex) => {
             dispatch({ type: 'SET_CHAPTER_INDEX', selectedChapterIndex: chapterIndex})
         }
     }

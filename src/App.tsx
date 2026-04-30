@@ -37,6 +37,7 @@ export function App() {
         <Route path="/" element={<Home />} />
         <Route path="/add-novel" element={<AddNovel/>} />
         <Route path="/chapter-list" element={<ChapterList/>} />
+        <Route path="/chapter" element={<ChapterList/>} />
         <Route path="*" element={<Home />} />
       </Routes>
       <AppGlasses />

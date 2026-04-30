@@ -6,62 +6,11 @@ import JSZip from 'jszip'
 import { ChapterContent } from '@/types/novelTypes'
 import { useEffect, useState } from 'react'
 import { Popup } from '@/components/popup'
-
-async function getChapterList(file: Blob | File): Promise<ChapterContent[]> {
-    const zip = await JSZip.loadAsync(file);
-
-    const containerFile = zip.file("META-INF/container.xml");
-    if (!containerFile) throw new Error("Invalid EPUB: missing container.xml");
-    
-    const container = await containerFile.async("string");
-    const containerDoc = new DOMParser().parseFromString(container, "text/xml");
-    const opfPath = containerDoc.querySelector("rootfile")?.getAttribute("full-path");
-    if (!opfPath) throw new Error("Invalid EPUB: missing rootfile path");
-
-    const opfFile = zip.file(opfPath);
-    if (!opfFile) throw new Error(`Invalid EPUB: missing OPF file at ${opfPath}`);
-
-    const opf = await opfFile.async("string");
-    const opfDoc = new DOMParser().parseFromString(opf, "text/xml");
-
-    let tocEl = opfDoc.querySelector('manifest > item[properties~="nav"]') ||
-                opfDoc.querySelector('manifest > item[media-type="application/x-dtbncx+xml"]');
-    const tocPath = tocEl?.getAttribute("href") ?? null
-
-    let chapterList: ChapterContent[] = []
-    
-    if(tocPath != null) {
-        
-        const opfDir = opfPath.includes("/")
-            ? opfPath.slice(0, opfPath.lastIndexOf("/") + 1)
-            : ""
-        const tocFile = zip.file(opfDir + tocPath);
-        if (!tocFile) throw new Error("Invalid EPUB: missing container.xml");
-
-        const toc = await tocFile.async("string");
-        const tocDoc = new DOMParser().parseFromString(toc, "text/xml");
-        const chapterPointsEl = tocDoc.getElementsByTagName("navPoint");
-
-        let index = 0
-        for (const chapterNavPoint of Array.from(chapterPointsEl)) {
-            const title = chapterNavPoint.querySelector('navLabel > text')?.textContent?.trim()
-            const chapterPath = opfDir + chapterNavPoint.querySelector('content')?.getAttribute('src')
-            chapterList.push({
-                name: title ?? "Chapter " + index,
-                chapterIndex: index,
-                chapterPath: chapterPath
-            })
-            index += 1
-        }   
-    }
-
-    return chapterList
-}
-
+import { getChapterList } from '@/data/novel'
 
 export function ChapterList() {
     const navigate = useNavigate()
-    const { selectedNovel, selectedChapterList, setChapterList, setChapter} = useNovelContext()
+    const { selectedNovel, selectedChapterList, selectedChapterIndex, setChapterList, setChapter} = useNovelContext()
     
     const [loadedChaptersState, setLoadedChaptersState] = useState(false)
     const [failed, setFailed] = useState(false)
@@ -89,8 +38,9 @@ export function ChapterList() {
     const selectChapter = (index: number) => {
         const select = async () => {
             try {
-                await selectChapter(index)
-                // Add code to navigate to glasses 
+                setChapter(index)
+                console.log(selectedChapterIndex)
+                navigate("/chapter")
             } catch {
                 setToastMessage("Failed to load chapter!")
                 setShowToast(true)
