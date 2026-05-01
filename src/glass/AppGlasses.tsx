@@ -8,9 +8,8 @@ import { bindKeyboard } from 'even-toolkit/keyboard'
 import { activateKeepAlive, deactivateKeepAlive } from 'even-toolkit/keep-alive'
 import { type GlassAction, type GlassNavState } from 'even-toolkit/types'
 import { useFlashPhase } from 'even-toolkit/useFlashPhase'
-import JSZip from 'jszip'
 
-import { getChapterList } from '@/data/novel'
+import { getChapterList, extractChapterContentsFromBlob } from '@/data/novel'
 import { useNovelContext } from '@/contexts/novelContext'
 import { onGlassAction, type AppSnapshot } from './selectors'
 import type { AppActions } from './shared'
@@ -52,56 +51,6 @@ const deriveScreen = createScreenMapper(
   ],
   'home',
 )
-
-async function extractChapterContentsFromBlob(epubBlob: Blob, filePath: string, blacklist: string[]): Promise<string[]> {
-  try {
-    const zip = await JSZip.loadAsync(epubBlob)
-
-    // Try exact path first, then fallback to matching by suffix
-    let candidate: any = zip.file(filePath as any)
-    if (Array.isArray(candidate)) candidate = candidate[0]
-    if (!candidate) {
-      candidate = (zip.file(new RegExp(filePath.replace(/^[./]+/, '') + '$') as any) as any)
-      if (Array.isArray(candidate)) candidate = candidate[0]
-    }
-
-    if (!candidate) {
-      const basename = filePath.split('/').pop() || filePath
-      const bySuffix: any = zip.file(new RegExp(basename + '$') as any)
-      candidate = Array.isArray(bySuffix) ? bySuffix[0] : bySuffix
-    }
-
-    if (!candidate) return []
-
-    const content = await candidate.async('string')
-
-    // Parse XHTML and extract block-level text nodes
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(content, 'application/xhtml+xml')
-
-    const blocks = Array.from(doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div'))
-
-    if (blocks.length > 0) {
-      return blocks
-        .map((el) => el.textContent || '')
-        .map((t) => t.replace(/\s+/g, ' ').trim())
-        .filter(Boolean)
-        .filter((t) => t.replaceAll('\n', '').length > 0)
-        .filter((t) => !blacklist.includes(t))
-        .map((t) => t + '\n')
-    }
-
-    // Fallback: use body innerText split by newlines
-    const bodyText = doc.body?.textContent ?? ''
-    return bodyText
-      .split(/\r?\n/)
-      .map((t) => t.replace(/\s+/g, ' ').trim())
-      .filter(Boolean)
-  } catch (err) {
-    console.error('extractChapterContentsFromBlob error', err)
-    return []
-  }
-}
 
 export function AppGlasses() {
   const navigate = useNavigate()
@@ -179,6 +128,7 @@ export function AppGlasses() {
   const ctxRef = useRef<AppActions>({
     navigate,
     selectNovel: async () => {},
+    checkLoadedChapters: async () => {return false},
     selectChapter: async () => {},
   })
 
@@ -194,6 +144,11 @@ export function AppGlasses() {
       const chapters = await getChapterList(resolved.epubBlob)
       await setChapterList(chapters)
     },
+    checkLoadedChapters: async () => {
+      const disposed = false
+      await waitForLoadedChapters(0, 50, () => disposed)
+      return disposed
+    },
     selectChapter: async (index: number) => {
       await setChapter(index)
     },
@@ -206,11 +161,13 @@ export function AppGlasses() {
   )
 
   const bridgeRef = useRef<EvenAppBridge | null>(null)
-  const navRef = useRef<GlassNavState>({ highlightedIndex: 0, screen: 'home' })
+  const navRef = useRef<any>({ highlightedIndex: 0, screen: 'home' })
   const screenRef = useRef<string>(screen)
   const getSnapshotForScreenRef = useRef(getSnapshotForScreen)
 
   const lastRenderedRef = useRef<{ screen: string; content: string }>({ screen: '', content: '' })
+  const lastChapterRef = useRef<number>(-1)
+  const chapterRef = useRef<number>(selectedChapterIndex)
   const renderInProgressRef = useRef(false)
   const renderQueuedRef = useRef(false)
 
@@ -220,11 +177,25 @@ export function AppGlasses() {
   const loadedRef = useRef(loaded)
   useEffect(() => { loadedRef.current = loaded }, [loaded])
 
+  const loadedChapterRef = useRef(selectedChapterList)
+  useEffect(() => { loadedChapterRef.current = selectedChapterList}, [selectedChapterList])
+
   const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
   async function waitForLoaded(timeoutMs = 0, interval = 50, shouldAbort?: () => boolean): Promise<boolean> {
     const start = Date.now()
     while (!loadedRef.current) {
+      if (shouldAbort?.()) return false
+      if (timeoutMs > 0 && Date.now() - start > timeoutMs) return false
+      await sleep(interval)
+    }
+
+    return true
+  }
+
+  async function waitForLoadedChapters(timeoutMs = 0, interval = 50, shouldAbort?: () => boolean): Promise<boolean> {
+    const start = Date.now()
+    while (!loadedChapterRef.current) {
       if (shouldAbort?.()) return false
       if (timeoutMs > 0 && Date.now() - start > timeoutMs) return false
       await sleep(interval)
@@ -249,7 +220,7 @@ export function AppGlasses() {
         if (!bridge) return
 
         const currentScreen = screenRef.current
-        const nav: GlassNavState = { ...navRef.current, screen: currentScreen }
+        const nav: any = { ...navRef.current, screen: currentScreen }
         const snap = getSnapshotForScreenRef.current(currentScreen)
 
         // Clamp highlight for list screens.
@@ -265,6 +236,14 @@ export function AppGlasses() {
         const sig = getRebuildSignature(rebuild)
         if (lastRenderedRef.current.screen !== currentScreen || lastRenderedRef.current.content !== sig) {
           if (currentScreen === 'chapter' && lastRenderedRef.current.screen === 'chapter') {
+            if(chapterRef != lastChapterRef)
+              navRef.current = {
+                ...nav, 
+                toggleMenu: false,
+                chapterScrollOffset: 0,
+                chapterEndAttempts: 0,
+              }
+
             const upgrade = buildChapterTextUpgrade(snap as any, nav as any, 3)
             const ok = await bridge.textContainerUpgrade(upgrade as any)
             if (!ok) {
@@ -277,6 +256,7 @@ export function AppGlasses() {
           }
 
           lastRenderedRef.current = { screen: currentScreen, content: sig }
+          lastChapterRef.current = selectedChapterIndex
         }
       } finally {
         renderInProgressRef.current = false
@@ -292,7 +272,7 @@ export function AppGlasses() {
     (action: GlassAction) => {
       const currentScreen = screenRef.current
       const snap = getSnapshotForScreenRef.current(currentScreen)
-      const nav: GlassNavState = { ...navRef.current, screen: currentScreen }
+      const nav: any = { ...navRef.current, screen: currentScreen }
 
       const newNav = handleGlassAction(action, nav, snap)
       navRef.current = { ...newNav, screen: currentScreen }

@@ -1,24 +1,15 @@
 import type { AppSnapshot, AppActions } from '../shared'
-import { RebuildPageContainer, TextContainerProperty, TextContainerUpgrade } from '@evenrealities/even_hub_sdk'
+import { RebuildPageContainer, TextContainerProperty, TextContainerUpgrade, ListContainerProperty, ListItemContainerProperty } from '@evenrealities/even_hub_sdk'
+import { DISPLAY_H, DISPLAY_W } from 'even-toolkit/layout'
+import { moveHighlight } from 'even-toolkit'
+import { truncateLabel, LINE_WIDTH } from '../shared'
 
 const MAX_CONTENT_CHARS = 940
-const LINE_WIDTH = 58
 const WINDOW_OVERLAP_LINES = 10
 const END_PADDING = '\n\n\n\n'
 
-function normalizeLabel(label: string) {
-  return label.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
-function truncateLabel(label: string, maxLength: number) {
-  const normalized = normalizeLabel(label)
-  if (normalized.length <= maxLength) {
-    return normalized
-  }
-  return `${normalized.slice(0, Math.max(1, maxLength - 1))}…`
-}
-
 type ChapterNavState = {
+  toggleMenu?: Boolean
   chapterScrollOffset?: number
   chapterEndAttempts?: number
 }
@@ -44,6 +35,7 @@ function getChapterParts(snapshot: AppSnapshot) {
 
 function getScrollState(nav: any): ChapterNavState {
   return {
+    toggleMenu: nav?.toggleMenu ?? false,
     chapterScrollOffset: Math.max(0, Number(nav?.chapterScrollOffset ?? 0)),
     chapterEndAttempts: Math.max(0, Number(nav?.chapterEndAttempts ?? 0)),
   }
@@ -315,21 +307,51 @@ export const chapterScreen: any = {
   },
 
   action(action: any, nav: any, snapshot: AppSnapshot, ctx: AppActions) {
-    if (action.type === 'HIGHLIGHT_MOVE') {
-      return updateChapterScroll(nav, snapshot, action.direction, ctx)
+    if (action.type === 'HIGHLIGHT_MOVE') { // Triggers when scrolling at the bottom or top of the text container! 
+      if(nav.toggleMenu) {
+        const maxHighlightIndex = Math.max((snapshot?.buttons?.length ?? 0) - 1, 0)
+  
+        return {
+          ...nav,
+          highlightedIndex: moveHighlight(nav.highlightedIndex, action.direction, maxHighlightIndex),
+        }
+      } else return updateChapterScroll(nav, snapshot, action.direction, ctx)
     }
 
-    if (action.type === 'SELECT_HIGHLIGHTED') {
-      advanceToNextChapter(snapshot, ctx)
-      return {
-        ...nav,
-        chapterScrollOffset: 0,
-        chapterEndAttempts: 0,
+    if (action.type === 'SELECT_HIGHLIGHTED') { // Only relevant for the menu
+      if(nav.toggleMenu) {
+        switch(nav.highlightedIndex) {
+          case 0:
+            return {
+              ...nav,
+              toggleMenu: false
+            }
+          case 1:  
+            advanceToNextChapter(snapshot, ctx)
+            return {
+              ...nav,
+              toggleMenu: false,
+              chapterScrollOffset: 0,
+              chapterEndAttempts: 0,
+            }
+          case 2:
+            ctx.navigate("/chapter-list")
+            return {
+              ...nav,
+              toggleMenu: false,
+              chapterScrollOffset: 0,
+              chapterEndAttempts: 0,
+            }
+        }
+
       }
     }
 
-    if (action.type === 'GO_BACK') {
-      ctx.navigate('/chapter-list')
+    if (action.type === 'GO_BACK') { // Toggles the menu 
+      return {
+        ...nav,
+        toggleMenu: true
+      }
     }
 
     return nav
@@ -340,6 +362,30 @@ export function buildChapterRebuildContainer(snapshot: AppSnapshot, nav: any, co
   const { body, availableBodyChars } = getChapterParts(snapshot)
   const scrollState = getScrollState(nav)
   const windowedBody = buildWindowInfo(body, scrollState.chapterScrollOffset ?? 0, availableBodyChars).content
+
+  const menu = new ListContainerProperty({
+    xPosition: DISPLAY_W/2 - 10*10,
+    yPosition: DISPLAY_H/2 - 20*4,
+    width: 20*10,
+    height: 20*8,
+    borderColor: 8,
+    borderRadius: 5,
+    borderWidth: 1,
+    paddingLength: 5,
+    containerID: 4,
+    containerName: 'menu',
+    itemContainer: new ListItemContainerProperty({
+      itemCount: 3,
+      itemWidth: 0,
+      isItemSelectBorderEn: 1,
+      itemName: [
+        "Continue",
+        "Next Chapter",
+        "Back"
+      ],
+    }),
+    isEventCapture: 1,
+  })
 
   const text = new TextContainerProperty({
     xPosition: 0,
@@ -358,8 +404,8 @@ export function buildChapterRebuildContainer(snapshot: AppSnapshot, nav: any, co
 
   return new RebuildPageContainer({
     containerTotalNum: 1,
-    listObject: [],
-    textObject: [text],
+    listObject: scrollState.toggleMenu ? [menu] : [],
+    textObject: scrollState.toggleMenu ? [] : [text],
     imageObject: [],
   })
 }
@@ -369,6 +415,9 @@ export function buildChapterTextUpgrade(snapshot: AppSnapshot, nav: any, contain
   const scrollState = getScrollState(nav)
   const window = buildWindowInfo(body, scrollState.chapterScrollOffset ?? 0, availableBodyChars)
   const contentLength = window.contentLength
+
+  if(scrollState.toggleMenu)
+    return false
 
   return new TextContainerUpgrade({
     containerID,

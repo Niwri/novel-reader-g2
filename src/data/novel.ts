@@ -63,3 +63,53 @@ export async function getChapterList(file: Blob | File): Promise<ChapterContent[
 
     return chapterList
 }
+
+export async function extractChapterContentsFromBlob(epubBlob: Blob, filePath: string, blacklist: string[]): Promise<string[]> {
+  try {
+    const zip = await JSZip.loadAsync(epubBlob)
+
+    // Try exact path first, then fallback to matching by suffix
+    let candidate: any = zip.file(filePath as any)
+    if (Array.isArray(candidate)) candidate = candidate[0]
+    if (!candidate) {
+      candidate = (zip.file(new RegExp(filePath.replace(/^[./]+/, '') + '$') as any) as any)
+      if (Array.isArray(candidate)) candidate = candidate[0]
+    }
+
+    if (!candidate) {
+      const basename = filePath.split('/').pop() || filePath
+      const bySuffix: any = zip.file(new RegExp(basename + '$') as any)
+      candidate = Array.isArray(bySuffix) ? bySuffix[0] : bySuffix
+    }
+
+    if (!candidate) return []
+
+    const content = await candidate.async('string')
+
+    // Parse XHTML and extract block-level text nodes
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(content, 'application/xhtml+xml')
+
+    const blocks = Array.from(doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div'))
+
+    if (blocks.length > 0) {
+      return blocks
+        .map((el) => el.textContent || '')
+        .map((t) => t.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .filter((t) => t.replaceAll('\n', '').length > 0)
+        .filter((t) => !blacklist.includes(t))
+        .map((t) => t + '\n')
+    }
+
+    // Fallback: use body innerText split by newlines
+    const bodyText = doc.body?.textContent ?? ''
+    return bodyText
+      .split(/\r?\n/)
+      .map((t) => t.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+  } catch (err) {
+    console.error('extractChapterContentsFromBlob error', err)
+    return []
+  }
+}

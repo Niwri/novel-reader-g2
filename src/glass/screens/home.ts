@@ -2,17 +2,11 @@ import { moveHighlight } from 'even-toolkit/glass-nav'
 import type { AppSnapshot, AppActions } from '../shared'
 import { RebuildPageContainer, ListContainerProperty, ListItemContainerProperty, TextContainerProperty } from '@evenrealities/even_hub_sdk'
 import { DISPLAY_W, DISPLAY_H } from 'even-toolkit/layout'
+import { GLASSES_SEPARATOR_WIDTH } from 'even-toolkit'
+import { truncateLabel } from '../shared'
 
 const MAX_BUTTON_LABEL_LENGTH = 60
 const MAX_LIST_ITEMS = 20
-
-function truncateLabel(label: string, maxLength: number) {
-  if (label.length <= maxLength) {
-    return label
-  }
-
-  return `${label.slice(0, Math.max(1, maxLength - 1))}…`
-}
 
 export const homeScreen: any = {
   display(snapshot: AppSnapshot, nav: any) {
@@ -34,7 +28,8 @@ export const homeScreen: any = {
       if (!selected) {
         return nav
       }
-      void ctx.selectNovel(selected.index).then(() => {
+      void ctx.selectNovel(selected.index).then(async () => {
+        await ctx.checkLoadedChapters()
         ctx.navigate(selected.target)
       })
     }
@@ -48,16 +43,54 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
   const names = buttons
     .slice(0, MAX_LIST_ITEMS)
     .map((b) => truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH))
+  
+  const header = 'Pick Your Novel'
+  const noNovel = 'Add a novel on the phone to get started!'
 
-  if (names.length === 0) {
-    names.push('No novels')
-  }
+  let text = [
+    new TextContainerProperty({
+      xPosition: DISPLAY_W/2 - header.length*5,
+      yPosition: 0,
+      width: header.length*10,
+      height: 30,
+      containerID: 5,
+      containerName: 'home-title',
+
+      content: header,
+      isEventCapture: 0
+    }),
+    new TextContainerProperty({
+      xPosition: 5,
+      yPosition: 15,
+      width: DISPLAY_W,
+      height: 30,
+      containerID: 6,
+      containerName: 'home-title-border',
+      content: `${'─'.repeat(GLASSES_SEPARATOR_WIDTH+1)}`,
+      isEventCapture: 0
+    })
+  ]
+
+  if(names.length === 0)
+    text.push(
+      new TextContainerProperty({
+        xPosition: DISPLAY_W/2 - noNovel.length*5,
+        yPosition: 50,
+        width: noNovel.length*10,
+        height: 30,
+        containerID: 7,
+        containerName: 'home-no-novel',
+        content: noNovel,
+        isEventCapture: 0
+      })
+    )
+
 
   const list = new ListContainerProperty({
     xPosition: 10,
-    yPosition: 10,
+    yPosition: 40,
     width: DISPLAY_W - 20,
-    height: DISPLAY_H - 20,
+    height: names.length * 50,
     containerID,
     containerName: 'home-list',
     itemContainer: new ListItemContainerProperty({
@@ -70,9 +103,9 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
   })
 
   return new RebuildPageContainer({
-    containerTotalNum: 1,
+    containerTotalNum: 3,
     listObject: [list],
-    textObject: [],
+    textObject: text,
     imageObject: [],
   })
 }

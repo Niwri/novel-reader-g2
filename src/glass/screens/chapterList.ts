@@ -2,20 +2,7 @@ import type { AppSnapshot, AppActions } from '../shared'
 import { moveHighlight } from 'even-toolkit/glass-nav'
 import { RebuildPageContainer, ListContainerProperty, ListItemContainerProperty } from '@evenrealities/even_hub_sdk'
 import { DISPLAY_H, DISPLAY_W } from 'even-toolkit/layout'
-
-const MAX_BUTTON_LABEL_LENGTH = 60
-
-function normalizeLabel(label: string) {
-  return label.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
-function truncateLabel(label: string, maxLength: number) {
-  const normalized = normalizeLabel(label)
-  if (normalized.length <= maxLength) {
-    return normalized
-  }
-  return `${normalized.slice(0, Math.max(1, maxLength - 1))}…`
-}
+import { truncateLabel, LINE_WIDTH } from '../shared'
 
 export const chapterListScreen: any = {
   display(snapshot: AppSnapshot, nav: any) {
@@ -47,13 +34,13 @@ export const chapterListScreen: any = {
       }
 
       // Drill down into the selected range.
-      const stack = normalizeStack(nav, snapshot)
+      const stack = getStack(nav, snapshot)
       stack.push({ start: selected.start, count: selected.count })
       return { ...nav, highlightedIndex: 0, chapterListStack: stack }
     }
 
     if (action.type === 'GO_BACK') {
-      const stack = normalizeStack(nav, snapshot)
+      const stack = getStack(nav, snapshot)
       if (stack.length > 1) {
         stack.pop()
         return { ...nav, highlightedIndex: 0, chapterListStack: stack }
@@ -72,29 +59,18 @@ type ChapterListEntry =
   | { kind: 'range'; label: string; start: number; count: number }
   | { kind: 'chapter'; label: string; chapterIndex: number }
 
-function normalizeStack(nav: any, snapshot: AppSnapshot): ChapterListStackFrame[] {
+function getStack(nav: any, snapshot: AppSnapshot): ChapterListStackFrame[] {
   const total = snapshot?.buttons?.length ?? 0
   const raw = nav?.chapterListStack
 
-  if (!Array.isArray(raw) || raw.length === 0) {
+  if (!Array.isArray(raw) || raw.length === 0)
     return [{ start: 0, count: total }]
-  }
+  
 
-  const cleaned: ChapterListStackFrame[] = []
-  for (const frame of raw) {
-    const start = Number(frame?.start ?? 0)
-    const count = Number(frame?.count ?? 0)
-    if (!Number.isFinite(start) || !Number.isFinite(count)) continue
-    if (count <= 0) continue
-    cleaned.push({ start: Math.max(0, start), count })
-  }
-
-  if (cleaned.length === 0) cleaned.push({ start: 0, count: total })
-  return cleaned
+  return raw
 }
 
 function computeChunkSize(count: number): number {
-  // Goal: <= 10 entries per level, drilling down by powers of 10.
   if (count <= 10) return 1
   const raw = count / 10
   const exp = Math.ceil(Math.log10(raw))
@@ -106,7 +82,7 @@ function getChapterListEntries(snapshot: AppSnapshot, nav: any): ChapterListEntr
   const total = buttons.length
   if (total === 0) return []
 
-  const stack = normalizeStack(nav, snapshot)
+  const stack = getStack(nav, snapshot)
   const { start, count } = stack[stack.length - 1]
   const safeStart = Math.max(0, Math.min(start, Math.max(total - 1, 0)))
   const safeEndExclusive = Math.min(total, safeStart + Math.max(0, count))
@@ -116,7 +92,7 @@ function getChapterListEntries(snapshot: AppSnapshot, nav: any): ChapterListEntr
     const slice = buttons.slice(safeStart, safeEndExclusive)
     return slice.map((b, i) => ({
       kind: 'chapter',
-      label: truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH),
+      label: truncateLabel(String(b.label ?? ''), LINE_WIDTH),
       chapterIndex: safeStart + i,
     }))
   }
@@ -128,7 +104,7 @@ function getChapterListEntries(snapshot: AppSnapshot, nav: any): ChapterListEntr
     const groupCount = groupEndExclusive - groupStart
     if (groupCount <= 0) continue
 
-    const label = `${groupStart}-${groupEndExclusive - 1}`
+    const label = `Sections ${groupStart}-${groupEndExclusive - 1}`
     groups.push({ kind: 'range', label, start: groupStart, count: groupCount })
     if (groups.length >= 10) break
   }
