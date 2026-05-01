@@ -11,3 +11,5 @@ React, Vite.js, Even SDK
 
 ## Features to Add
 - Adding novels via webnovel links, akin to [WebToEpub](https://github.com/dteviot/WebToEpub)
+
+evenhub pack app.json dist -o myapp.ehpk

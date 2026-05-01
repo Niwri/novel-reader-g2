@@ -212,6 +212,8 @@ function shiftWindowOffset(body: string, current: WindowInfo, direction: 'up' | 
   return Math.max(0, lineStarts[nextStartLine] ?? 0)
 }
 
+const _pendingChapterSelects = new Set<number>()
+
 function advanceToNextChapter(snapshot: AppSnapshot, ctx: AppActions) {
   const chapterIndex = Number(snapshot.chapterIndex ?? -1)
   const chapterCount = Number(snapshot.chapterCount ?? 0)
@@ -219,13 +221,19 @@ function advanceToNextChapter(snapshot: AppSnapshot, ctx: AppActions) {
   if (chapterIndex < 0 || chapterCount <= 0) return false
   if (chapterIndex >= chapterCount - 1) return false
 
-  void ctx.selectChapter(chapterIndex + 1).then(() => {
+  const next = chapterIndex + 1
+  if (_pendingChapterSelects.has(next)) return false
+  _pendingChapterSelects.add(next)
+
+  void ctx.selectChapter(next).then(() => {
     ctx.navigate('/chapter')
+    _pendingChapterSelects.delete(next)
+  }).catch(() => {
+    _pendingChapterSelects.delete(next)
   })
 
   return true
 }
-
 function advanceToPreviousChapter(snapshot: AppSnapshot, ctx: AppActions) {
   const chapterIndex = Number(snapshot.chapterIndex ?? -1)
   const chapterCount = Number(snapshot.chapterCount ?? 0)
@@ -233,8 +241,15 @@ function advanceToPreviousChapter(snapshot: AppSnapshot, ctx: AppActions) {
   if (chapterIndex < 0 || chapterCount <= 0) return false
   if (chapterIndex <= 0) return false
 
-  void ctx.selectChapter(chapterIndex - 1).then(() => {
+  const prev = chapterIndex - 1
+  if (_pendingChapterSelects.has(prev)) return false
+  _pendingChapterSelects.add(prev)
+
+  void ctx.selectChapter(prev).then(() => {
     ctx.navigate('/chapter')
+    _pendingChapterSelects.delete(prev)
+  }).catch(() => {
+    _pendingChapterSelects.delete(prev)
   })
 
   return true
@@ -320,25 +335,30 @@ export const chapterScreen: any = {
 
     if (action.type === 'SELECT_HIGHLIGHTED') { // Only relevant for the menu
       if(nav.toggleMenu) {
-        switch(nav.highlightedIndex) {
+        const hi = Number(nav.highlightedIndex ?? 0)
+        switch(hi) {
           case 0:
             return {
               ...nav,
+              highlightedIndex: 0,
               toggleMenu: false
             }
           case 1:  
-            advanceToNextChapter(snapshot, ctx)
-            return {
-              ...nav,
-              toggleMenu: false,
-              chapterScrollOffset: 0,
-              chapterEndAttempts: 0,
-            }
+            if(advanceToNextChapter(snapshot, ctx))
+              return {
+                ...nav,
+                toggleMenu: false,
+                highlightedIndex: 0,
+                chapterScrollOffset: 0,
+                chapterEndAttempts: 0,
+              }
+            break
           case 2:
             ctx.navigate("/chapter-list")
             return {
               ...nav,
               toggleMenu: false,
+              highlightedIndex: 0,
               chapterScrollOffset: 0,
               chapterEndAttempts: 0,
             }

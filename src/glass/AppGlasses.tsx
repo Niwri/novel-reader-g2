@@ -21,6 +21,11 @@ import { chapterScreen, buildChapterTextUpgrade } from './screens/chapter'
 const DISPLAY_W = 576
 const DISPLAY_H = 288
 
+type ChapterGlassNavState = GlassNavState & {
+  chapterScrollOffset?: number
+  chapterEndAttempts?: number
+}
+
 function buildRebuildContainerForScreen(screen: string, snapshot: AppSnapshot, nav: GlassNavState) {
   if (screen === 'chapter') return (chapterScreen.display as any)(snapshot, nav)
   if (screen === 'chapter-list') return (chapterListScreen.display as any)(snapshot, nav)
@@ -102,6 +107,7 @@ export function AppGlasses() {
       }
 
       if (s === 'chapter') {
+        chapterRef.current = selectedChapterIndex
         return {
           texts: chapterTexts,
           title: selectedChapterList[selectedChapterIndex]?.name ?? '',
@@ -161,7 +167,7 @@ export function AppGlasses() {
   )
 
   const bridgeRef = useRef<EvenAppBridge | null>(null)
-  const navRef = useRef<any>({ highlightedIndex: 0, screen: 'home' })
+  const navRef = useRef<ChapterGlassNavState>({ highlightedIndex: 0, screen: 'home' })
   const screenRef = useRef<string>(screen)
   const getSnapshotForScreenRef = useRef(getSnapshotForScreen)
 
@@ -220,7 +226,7 @@ export function AppGlasses() {
         if (!bridge) return
 
         const currentScreen = screenRef.current
-        const nav: any = { ...navRef.current, screen: currentScreen }
+        const nav: GlassNavState = { ...navRef.current, screen: currentScreen }
         const snap = getSnapshotForScreenRef.current(currentScreen)
 
         // Clamp highlight for list screens.
@@ -236,12 +242,11 @@ export function AppGlasses() {
         const sig = getRebuildSignature(rebuild)
         if (lastRenderedRef.current.screen !== currentScreen || lastRenderedRef.current.content !== sig) {
           if (currentScreen === 'chapter' && lastRenderedRef.current.screen === 'chapter') {
-            if(chapterRef != lastChapterRef)
+            if(chapterRef !== lastChapterRef)
               navRef.current = {
-                ...nav, 
-                toggleMenu: false,
+                ...navRef.current,
                 chapterScrollOffset: 0,
-                chapterEndAttempts: 0,
+                chapterEndAttempts: 0
               }
 
             const upgrade = buildChapterTextUpgrade(snap as any, nav as any, 3)
@@ -256,7 +261,7 @@ export function AppGlasses() {
           }
 
           lastRenderedRef.current = { screen: currentScreen, content: sig }
-          lastChapterRef.current = selectedChapterIndex
+          lastChapterRef.current = chapterRef.current
         }
       } finally {
         renderInProgressRef.current = false
