@@ -22,6 +22,7 @@ const DISPLAY_W = 576
 const DISPLAY_H = 288
 
 type ChapterGlassNavState = GlassNavState & {
+  toggleMenu?: Boolean
   chapterScrollOffset?: number
   chapterEndAttempts?: number
 }
@@ -211,7 +212,10 @@ export function AppGlasses() {
   }
 
   const scheduleRender = useCallback(() => {
+    console.debug('AppGlasses: scheduleRender invoked', { inProgress: renderInProgressRef.current, queued: renderQueuedRef.current })
     if (!bridgeRef.current) return
+
+    if(!loadedRef.current) return
 
     if (renderInProgressRef.current) {
       renderQueuedRef.current = true
@@ -226,6 +230,7 @@ export function AppGlasses() {
         if (!bridge) return
 
         const currentScreen = screenRef.current
+        console.debug('AppGlasses: preparing rebuild', { currentScreen, nav: navRef.current })
         const nav: GlassNavState = { ...navRef.current, screen: currentScreen }
         const snap = getSnapshotForScreenRef.current(currentScreen)
 
@@ -236,19 +241,23 @@ export function AppGlasses() {
           navRef.current = nav
         }
 
+        if (currentScreen === 'chapter' && lastRenderedRef.current.screen === 'chapter' && chapterRef.current !== lastChapterRef.current) {
+          navRef.current = {
+            ...navRef.current,
+            toggleMenu: false,
+            chapterScrollOffset: 0,
+            chapterEndAttempts: 0
+          }
+          lastChapterRef.current = chapterRef.current
+        }
+
         const rebuild = buildRebuildContainerForScreen(currentScreen, snap, nav)
         if (!rebuild) return
 
         const sig = getRebuildSignature(rebuild)
+        console.debug('AppGlasses: rebuild signature', { currentScreen, sig })
         if (lastRenderedRef.current.screen !== currentScreen || lastRenderedRef.current.content !== sig) {
           if (currentScreen === 'chapter' && lastRenderedRef.current.screen === 'chapter') {
-            if(chapterRef !== lastChapterRef)
-              navRef.current = {
-                ...navRef.current,
-                chapterScrollOffset: 0,
-                chapterEndAttempts: 0
-              }
-
             const upgrade = buildChapterTextUpgrade(snap as any, nav as any, 3)
             const ok = await bridge.textContainerUpgrade(upgrade as any)
             if (!ok) {
@@ -261,7 +270,6 @@ export function AppGlasses() {
           }
 
           lastRenderedRef.current = { screen: currentScreen, content: sig }
-          lastChapterRef.current = chapterRef.current
         }
       } finally {
         renderInProgressRef.current = false
@@ -288,15 +296,20 @@ export function AppGlasses() {
   )
 
   useEffect(() => {
-    let disposed = false
     let unsubscribe: null | (() => void) = null
-    let unbindKeyboard: null | (() => void) = null
+    let disposed = false
+
+    if(loadedRef.current)
+      return
 
     ;(async () => {
       try {
+        if(disposed) return
         const bridge = await waitForEvenAppBridge()
-        if (disposed) return
         bridgeRef.current = bridge
+        
+        const startupNav: GlassNavState = { highlightedIndex: 0, screen: 'home' }
+        navRef.current = startupNav
 
         // Startup must begin with the home page (using the same data model as rebuild).
         // Loading page
@@ -310,7 +323,7 @@ export function AppGlasses() {
                 yPosition: DISPLAY_H/2-25,
                 width: 100,
                 height: 50,
-                containerID: 1,
+                containerID: 100,
                 containerName: 'loading',
                 content: 'Loading...',
                 isEventCapture: 0
@@ -319,24 +332,8 @@ export function AppGlasses() {
             imageObject: [],
           }),
         )
+        console.debug('AppGlasses: Created Startup Container')
 
-        // Create a polling function waiting for 'loaded' to be true, then continue
-        await waitForLoaded(0, 50, () => disposed)
-        if (disposed) return
-
-        const startupNav: GlassNavState = { highlightedIndex: 0, screen: 'home' }
-        navRef.current = startupNav
-        const startupSnap = getSnapshotForScreenRef.current('home')
-        const startupRebuild = buildRebuildContainerForScreen('home', startupSnap, startupNav)
-        
-        lastRenderedRef.current = {
-          screen: 'home',
-          content: startupRebuild ? getRebuildSignature(startupRebuild) : '',
-        }
-
-        if (startupRebuild) {
-          await bridge.rebuildPageContainer(startupRebuild)
-        }
 
         unsubscribe = bridge.onEvenHubEvent((event) => {
           const tappedIndex = event?.listEvent?.currentSelectItemIndex
@@ -348,10 +345,13 @@ export function AppGlasses() {
           if (mapped) dispatchAction(mapped)
         })
 
-        unbindKeyboard = bindKeyboard(dispatchAction)
+        // unbindKeyboard = bindKeyboard(dispatchAction)
         activateKeepAlive('Novel Reader_direct_bridge')
 
-        scheduleRender()
+        // Create a polling function waiting for 'loaded' to be true, then continue
+        await waitForLoaded(0, 50, () => disposed)
+        console.debug('AppGlasses: waitForLoaded resolved', { loaded: loadedRef.current, novelsCount: (novels ?? []).length })
+
       } catch (err) {
         console.error('AppGlasses EvenAppBridge init error:', err)
       }
@@ -360,7 +360,6 @@ export function AppGlasses() {
     return () => {
       disposed = true
       unsubscribe?.()
-      unbindKeyboard?.()
       bridgeRef.current = null
       deactivateKeepAlive()
     }
@@ -370,7 +369,7 @@ export function AppGlasses() {
     // On route change, reset highlight and rebuild the page container for that screen.
     navRef.current = { highlightedIndex: 0, screen }
     scheduleRender()
-  }, [screen, scheduleRender])
+  }, [screen, scheduleRender, novels, loaded, selectedChapterList])
 
   useEffect(() => {
     if (screen === 'chapter') {

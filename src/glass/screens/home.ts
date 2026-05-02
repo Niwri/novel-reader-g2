@@ -58,16 +58,6 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
 
       content: header,
       isEventCapture: 0
-    }),
-    new TextContainerProperty({
-      xPosition: 5,
-      yPosition: 15,
-      width: DISPLAY_W,
-      height: 30,
-      containerID: 6,
-      containerName: 'home-title-border',
-      content: `${'─'.repeat(GLASSES_SEPARATOR_WIDTH+1)}`,
-      isEventCapture: 0
     })
   ]
 
@@ -75,7 +65,7 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
     text.push(
       new TextContainerProperty({
         xPosition: DISPLAY_W/2 - noNovel.length*5,
-        yPosition: 50,
+        yPosition: 70,
         width: noNovel.length*10,
         height: 30,
         containerID: 7,
@@ -88,9 +78,9 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
 
   const list = new ListContainerProperty({
     xPosition: 10,
-    yPosition: 40,
+    yPosition: 70,
     width: DISPLAY_W - 20,
-    height: names.length * 50,
+    height: Math.min(DISPLAY_H - 70, names.length * 40),
     containerID,
     containerName: 'home-list',
     itemContainer: new ListItemContainerProperty({
@@ -104,7 +94,7 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
 
   return new RebuildPageContainer({
     containerTotalNum: 3,
-    listObject: [list],
+    listObject: names.length === 0 ? [] : [list],
     textObject: text,
     imageObject: [],
   })

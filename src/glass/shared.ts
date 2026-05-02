@@ -20,7 +20,7 @@ export interface AppActions {
   selectChapter: (index: number) => Promise<void>
 }
 
-export const LINE_WIDTH = 58
+export const LINE_WIDTH = 53
 
 export function normalizeLabel(label: string) {
   return label.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ').trim()

@@ -6,7 +6,7 @@ import { truncateLabel, LINE_WIDTH } from '../shared'
 
 const MAX_CONTENT_CHARS = 940
 const WINDOW_OVERLAP_LINES = 10
-const END_PADDING = '\n\n\n\n'
+const END_PADDING = '\n'
 
 type ChapterNavState = {
   toggleMenu?: Boolean
@@ -138,10 +138,10 @@ function findLineIndexAtOrBeforeOffset(lineStarts: number[], offset: number): nu
 }
 
 function buildWindowInfo(body: string, offset: number, maxLength: number): WindowInfo {
-  const paddedBody = body + END_PADDING
-  const lines = paddedBody.split('\n')
+  const paddedBody = body
+  const lines = [...paddedBody.split('\n'), ...END_PADDING.split('')]
   const lineStarts = buildLineStartOffsets(lines)
-  const contentLength = paddedBody.length
+  const contentLength = paddedBody.length + END_PADDING.length
 
   if (lines.length === 0) {
     return {
@@ -154,9 +154,13 @@ function buildWindowInfo(body: string, offset: number, maxLength: number): Windo
     }
   }
 
-  const rawMaxOffset = Math.max(0, paddedBody.length - maxLength)
+  const rawMaxOffset = Math.max(0, paddedBody.length-1 + END_PADDING.length)
   const maxStartLineIndex = findLineIndexAtOrBeforeOffset(lineStarts, rawMaxOffset)
-  const maxOffset = lineStarts[maxStartLineIndex] ?? 0
+
+  // GET NEXT CHAPTER OFFSET
+  const refNextOffset = Math.max(0, paddedBody.length-maxLength + END_PADDING.length)
+  const refMaxStartLineIndex = findLineIndexAtOrBeforeOffset(lineStarts, refNextOffset)
+  const refMaxOffset = lineStarts[refMaxStartLineIndex] ?? 0
 
   const requestedLineIndex = findLineIndexAtOrBeforeOffset(lineStarts, offset)
   const startLineIndex = Math.max(0, Math.min(requestedLineIndex, maxStartLineIndex))
@@ -186,7 +190,7 @@ function buildWindowInfo(body: string, offset: number, maxLength: number): Windo
   return {
     content,
     offset: safeOffset,
-    maxOffset,
+    maxOffset: refMaxOffset,
     startLineIndex,
     lineCount,
     contentLength,
@@ -194,25 +198,23 @@ function buildWindowInfo(body: string, offset: number, maxLength: number): Windo
 }
 
 function shiftWindowOffset(body: string, current: WindowInfo, direction: 'up' | 'down', maxLength: number): number {
-  const paddedBody = body + END_PADDING
-  const lines = paddedBody.split('\n')
+  const paddedBody = body
+  const lines = [...paddedBody.split('\n'), ...END_PADDING.split('')]
   const lineStarts = buildLineStartOffsets(lines)
 
-  const rawMaxOffset = Math.max(0, paddedBody.length - maxLength)
+  const rawMaxOffset = Math.max(0, paddedBody.length-1 + END_PADDING.length)
   const maxStartLineIndex = findLineIndexAtOrBeforeOffset(lineStarts, rawMaxOffset)
 
   const stepLines = Math.max(1, (current.lineCount || 1) - WINDOW_OVERLAP_LINES)
 
   if (direction === 'down') {
     const nextStartLine = Math.min(maxStartLineIndex, current.startLineIndex + stepLines)
-    return Math.min(current.maxOffset, lineStarts[nextStartLine] ?? current.maxOffset)
+    return lineStarts[nextStartLine]
   }
 
   const nextStartLine = Math.max(0, current.startLineIndex - stepLines)
   return Math.max(0, lineStarts[nextStartLine] ?? 0)
 }
-
-const _pendingChapterSelects = new Set<number>()
 
 function advanceToNextChapter(snapshot: AppSnapshot, ctx: AppActions) {
   const chapterIndex = Number(snapshot.chapterIndex ?? -1)
@@ -222,14 +224,9 @@ function advanceToNextChapter(snapshot: AppSnapshot, ctx: AppActions) {
   if (chapterIndex >= chapterCount - 1) return false
 
   const next = chapterIndex + 1
-  if (_pendingChapterSelects.has(next)) return false
-  _pendingChapterSelects.add(next)
 
   void ctx.selectChapter(next).then(() => {
     ctx.navigate('/chapter')
-    _pendingChapterSelects.delete(next)
-  }).catch(() => {
-    _pendingChapterSelects.delete(next)
   })
 
   return true
@@ -242,14 +239,9 @@ function advanceToPreviousChapter(snapshot: AppSnapshot, ctx: AppActions) {
   if (chapterIndex <= 0) return false
 
   const prev = chapterIndex - 1
-  if (_pendingChapterSelects.has(prev)) return false
-  _pendingChapterSelects.add(prev)
 
   void ctx.selectChapter(prev).then(() => {
     ctx.navigate('/chapter')
-    _pendingChapterSelects.delete(prev)
-  }).catch(() => {
-    _pendingChapterSelects.delete(prev)
   })
 
   return true
@@ -261,6 +253,7 @@ function updateChapterScroll(nav: any, snapshot: AppSnapshot, direction: 'up' | 
   const current = buildWindowInfo(body, scrollState.chapterScrollOffset ?? 0, availableBodyChars)
   const atStart = current.offset <= 0
   const atEnd = current.offset >= current.maxOffset
+  console.log(current.offset, current.maxOffset)
 
   if (direction === 'up') {
     if (atStart) {
@@ -415,7 +408,7 @@ export function buildChapterRebuildContainer(snapshot: AppSnapshot, nav: any, co
     borderColor: 8,
     borderRadius: 10,
     borderWidth: 1,
-    paddingLength: 10,
+    paddingLength: 30,
     containerID,
     containerName: 'chapter',
     content: windowedBody,
