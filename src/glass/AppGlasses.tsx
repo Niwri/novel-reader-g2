@@ -25,6 +25,7 @@ type ChapterGlassNavState = GlassNavState & {
   toggleMenu?: Boolean
   chapterScrollOffset?: number
   chapterEndAttempts?: number
+  startIndex?: number;
 }
 
 function buildRebuildContainerForScreen(screen: string, snapshot: AppSnapshot, nav: GlassNavState) {
@@ -168,7 +169,7 @@ export function AppGlasses() {
   )
 
   const bridgeRef = useRef<EvenAppBridge | null>(null)
-  const navRef = useRef<ChapterGlassNavState>({ highlightedIndex: 0, screen: 'home' })
+  const navRef = useRef<ChapterGlassNavState>({ highlightedIndex: 0, screen: 'home', startIndex: 0 })
   const screenRef = useRef<string>(screen)
   const getSnapshotForScreenRef = useRef(getSnapshotForScreen)
 
@@ -308,7 +309,7 @@ export function AppGlasses() {
         const bridge = await waitForEvenAppBridge()
         bridgeRef.current = bridge
         
-        const startupNav: GlassNavState = { highlightedIndex: 0, screen: 'home' }
+        const startupNav: ChapterGlassNavState = { highlightedIndex: 0, screen: 'home', startIndex: 0 }
         navRef.current = startupNav
 
         // Startup must begin with the home page (using the same data model as rebuild).
@@ -367,7 +368,7 @@ export function AppGlasses() {
 
   useEffect(() => {
     // On route change, reset highlight and rebuild the page container for that screen.
-    navRef.current = { highlightedIndex: 0, screen }
+    navRef.current = { highlightedIndex: 0, screen, startIndex: 0 }
     scheduleRender()
   }, [screen, scheduleRender, novels, loaded, selectedChapterList])
 

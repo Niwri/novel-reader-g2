@@ -6,7 +6,7 @@ import { GLASSES_SEPARATOR_WIDTH } from 'even-toolkit'
 import { truncateLabel } from '../shared'
 
 const MAX_BUTTON_LABEL_LENGTH = 60
-const MAX_LIST_ITEMS = 20
+const MAX_LIST_ITEMS = 1
 
 export const homeScreen: any = {
   display(snapshot: AppSnapshot, nav: any) {
@@ -14,8 +14,15 @@ export const homeScreen: any = {
   },
 
   action(action: any, nav: any, snapshot: AppSnapshot, ctx: AppActions) {
+    let padding = 0
+    if(snapshot?.buttons && snapshot?.buttons?.length > MAX_LIST_ITEMS) {
+      padding = 1
+      if(nav.startIndex && nav.startIndex > 0)
+        padding = 2
+    }
+    
     if (action.type === 'HIGHLIGHT_MOVE') {
-      const maxHighlightIndex = Math.max((snapshot?.buttons?.length ?? 0) - 1, 0)
+      const maxHighlightIndex = Math.max(MAX_LIST_ITEMS - 1 + padding, 0)
 
       return {
         ...nav,
@@ -23,8 +30,26 @@ export const homeScreen: any = {
       }
     }
 
-    if (action.type === 'SELECT_HIGHLIGHTED') {
-      const selected = snapshot?.buttons?.[nav.highlightedIndex]
+    if (action.type === 'SELECT_HIGHLIGHTED') { 
+      if(padding == 2 && nav.highlightedIndex == 0)
+        return {
+          ...nav,
+          startIndex: nav.startIndex - 1
+        }
+
+      if(padding == 2 && nav.highlightedIndex == MAX_LIST_ITEMS + 1)
+        return {
+          ...nav,
+          startIndex: nav.startIndex + 1
+        }
+      
+      if(padding == 1 && nav.highlightedIndex == MAX_LIST_ITEMS)
+        return {
+          ...nav,
+          startIndex: nav.startIndex + 1
+        }
+
+      const selected = snapshot?.buttons?.[(nav.startIndex && nav.startIndex * MAX_LIST_ITEMS) + nav.highlightedIndex - (padding == 2 ? 1 : 0)]
       if (!selected) {
         return nav
       }
@@ -40,9 +65,18 @@ export const homeScreen: any = {
 
 export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, containerID = 1) {
   const buttons = snapshot?.buttons ?? []
-  const names = buttons
-    .slice(0, MAX_LIST_ITEMS)
+  
+  const exceedFlag = buttons.length > MAX_LIST_ITEMS
+  const navIndex = nav.startIndex ?? 0
+
+  let names = buttons
+    .slice(MAX_LIST_ITEMS*navIndex, MAX_LIST_ITEMS*(navIndex+1))
     .map((b) => truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH))
+
+  if(exceedFlag) {
+    names = [...names, "Next Chapter"]
+  }
+  
   
   const header = 'Pick Your Novel'
   const noNovel = 'Add a novel on the phone to get started!'

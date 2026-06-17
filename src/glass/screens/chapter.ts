@@ -363,7 +363,7 @@ export const chapterScreen: any = {
     if (action.type === 'GO_BACK') { // Toggles the menu 
       return {
         ...nav,
-        toggleMenu: true
+        toggleMenu: !nav.toggleMenu
       }
     }
 

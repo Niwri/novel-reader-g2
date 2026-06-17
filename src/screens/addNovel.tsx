@@ -3,9 +3,10 @@ import { IcEditNew, IcGuideBack } from 'even-toolkit/web/icons/svg-icons'
 import { useRef, useState, useEffect, type ChangeEvent } from 'react'
 import { useNovelContext } from '../contexts/novelContext'
 import { useNavigate } from 'react-router'
-import { v4 as uuidv4 } from 'uuid'
+import { v5 as uuidv5 } from 'uuid'
+
+const NOVEL_NAMESPACE = '550e8400-e29b-41d4-a716-446655440000'
 import type { Novel } from '../types/novelTypes'
-import { Toast } from 'even-toolkit/web'
 import JSZip from "jszip";
 import { Popup } from '@/components/popup'
 
@@ -93,7 +94,7 @@ async function getEPUBInfo(file: File): Promise<EpubInfo> {
     return { 
         loaded: true,
         data: {
-            id: uuidv4(),
+            id: uuidv5(title, NOVEL_NAMESPACE),
             title: title,
             author: author,
             coverImage: coverImage ?? "",
