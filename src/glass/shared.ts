@@ -1,3 +1,5 @@
+import { ChapterPosition } from "@/types/novelTypes"
+
 export interface AppButton {
   label: string
   index: number
@@ -18,6 +20,7 @@ export interface AppActions {
   selectNovel: (index: number) => Promise<void>
   checkLoadedChapters: () => Promise<Boolean>
   selectChapter: (index: number) => Promise<void>
+  updatePosition: (chapterPos: ChapterPosition) => Promise<void>
 }
 
 export const LINE_WIDTH = 53

@@ -86,7 +86,6 @@ export async function extractChapterContentsFromBlob(epubBlob: Blob, filePath: s
 
     const content = await candidate.async('string')
 
-    // Parse XHTML and extract block-level text nodes
     const parser = new DOMParser()
     const doc = parser.parseFromString(content, 'application/xhtml+xml')
 

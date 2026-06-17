@@ -17,6 +17,7 @@ import type { AppActions } from './shared'
 import { homeScreen } from './screens/home'
 import { chapterListScreen } from './screens/chapterList'
 import { chapterScreen, buildChapterTextUpgrade } from './screens/chapter'
+import { ChapterPosition } from '@/types/novelTypes'
 
 const DISPLAY_W = 576
 const DISPLAY_H = 288
@@ -64,7 +65,7 @@ export function AppGlasses() {
   const location = useLocation()
   const screen = deriveScreen(location.pathname)
   const flashPhase = useFlashPhase(screen === 'home' || screen === 'chapter-list')
-  const { novels, loaded, selectedNovel, selectedChapterList, selectedChapterIndex, setChapterList, setSelectedNovel, setChapter } = useNovelContext()
+  const { novels, loaded, selectedNovel, selectedChapterList, selectedChapterIndex, setChapterList, setSelectedNovel, setChapter, updatePosition } = useNovelContext()
 
   const [chapterTexts, setChapterTexts] = useState<string[]>([])
 
@@ -138,6 +139,7 @@ export function AppGlasses() {
     selectNovel: async () => {},
     checkLoadedChapters: async () => {return false},
     selectChapter: async () => {},
+    updatePosition: async (chapterPos: ChapterPosition) => {}
   })
 
   ctxRef.current = {
@@ -160,6 +162,9 @@ export function AppGlasses() {
     selectChapter: async (index: number) => {
       await setChapter(index)
     },
+    updatePosition: async (chapterPos: ChapterPosition) => {
+      await updatePosition(chapterPos)
+    }
   }
 
   const handleGlassAction = useCallback(

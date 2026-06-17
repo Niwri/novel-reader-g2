@@ -1,6 +1,6 @@
 import { useState, useEffect, useReducer, createContext, useContext, type ReactNode } from 'react'
 import { getAllNovels, getNovelBlob, saveNovel, deleteNovel } from '../lib/db'
-import type { ChapterContent, Novel } from '../types/novelTypes'
+import type { ChapterContent, ChapterPosition, Novel } from '../types/novelTypes'
 
 // --- States ---
 interface NovelState {
@@ -31,6 +31,7 @@ interface NovelContextValue {
     addNovel: (novel: Novel) => Promise<void>
     removeNovel: (novel: Novel) => Promise<void>
     updateNovel: (novel: Novel) => Promise<void>
+    updatePosition: (chapterPos: ChapterPosition) => Promise<void>
     setChapterList: (chapters: ChapterContent[]) => void
     setChapter: (chapterIndex: number) => void
 }
@@ -132,6 +133,18 @@ export function NovelProvider({children}: {children: ReactNode}) {
         },
         setChapter: (chapterIndex) => {
             dispatch({ type: 'SET_CHAPTER_INDEX', selectedChapterIndex: chapterIndex})
+        },
+        updatePosition: async (chapterPos) => {
+            if(state.selectedNovel) {
+                state.selectedNovel.lastPosition = chapterPos
+                state.selectedNovel.lastReadAt = new Date().toISOString()
+                try {
+                    await saveNovel(state.selectedNovel)
+                } catch (e) {
+                    console.error('saveNovel failed', e)
+                    throw e
+                }
+            } else return 
         }
     }
 

@@ -27,6 +27,7 @@ export const chapterListScreen: any = {
 
       if (selected.kind === 'chapter') {
         void ctx.selectChapter(selected.chapterIndex).then(() => {
+          
           ctx.navigate('/chapter')
         })
 
