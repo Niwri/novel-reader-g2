@@ -89,10 +89,29 @@ export async function extractChapterContentsFromBlob(epubBlob: Blob, filePath: s
     const parser = new DOMParser()
     const doc = parser.parseFromString(content, 'application/xhtml+xml')
 
-    const blocks = Array.from(doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div'))
+    // Only take elements with no children, only text.
+    const candidateBlocks = Array.from(doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div'))
+    const blocks = candidateBlocks.filter((el) => {
+      if (el.childElementCount > 0) return false
+      const hasDirectText = Array.from(el.childNodes).some(
+        (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim().length > 0,
+      )
+      return hasDirectText
+    })
 
     if (blocks.length > 0) {
       return blocks
+        .map((el) => el.textContent || '')
+        .map((t) => t.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .filter((t) => t.replaceAll('\n', '').length > 0)
+        .filter((t) => !blacklist.includes(t))
+        .map((t) => t + '\n')
+    }
+
+    // If above case fails, take text regardless of if it has children. (Danger!)
+    if (candidateBlocks.length > 0) {
+      return candidateBlocks
         .map((el) => el.textContent || '')
         .map((t) => t.replace(/\s+/g, ' ').trim())
         .filter(Boolean)
