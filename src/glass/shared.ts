@@ -1,6 +1,7 @@
 import { ChapterPosition } from "@/types/novelTypes"
 
 export const GLASSES_CHAPTER_LIST_MAX_ITEMS = 10
+export const MAX_NOVEL_LIST_LENGTH = 8
 
 export interface AppButton {
   label: string

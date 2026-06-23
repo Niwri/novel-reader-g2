@@ -2,11 +2,9 @@ import { moveHighlight } from 'even-toolkit/glass-nav'
 import type { AppSnapshot, AppActions } from '../shared'
 import { RebuildPageContainer, ListContainerProperty, ListItemContainerProperty, TextContainerProperty } from '@evenrealities/even_hub_sdk'
 import { DISPLAY_W, DISPLAY_H } from 'even-toolkit/layout'
-import { GLASSES_SEPARATOR_WIDTH } from 'even-toolkit'
-import { truncateLabel } from '../shared'
+import { truncateLabel, MAX_NOVEL_LIST_LENGTH  } from '../shared'
 
 const MAX_BUTTON_LABEL_LENGTH = 60
-const MAX_LIST_ITEMS = 1
 
 export const homeScreen: any = {
   display(snapshot: AppSnapshot, nav: any) {
@@ -22,10 +20,10 @@ export const homeScreen: any = {
       return nav
 
     let prevFlag = nav.startIndex > 0
-    let nextFlag = (snapshot.buttons.length / MAX_LIST_ITEMS) > (nav.startIndex + 1)
+    let nextFlag = (snapshot.buttons.length / MAX_NOVEL_LIST_LENGTH) > (nav.startIndex + 1)
     
     if (action.type === 'HIGHLIGHT_MOVE') {
-      const maxHighlightIndex = Math.max(MAX_LIST_ITEMS - 1 + (prevFlag ? 1 : 0) + (nextFlag ? 1 : 0), 0)
+      const maxHighlightIndex = Math.max(MAX_NOVEL_LIST_LENGTH - 1 + (prevFlag ? 1 : 0) + (nextFlag ? 1 : 0), 0)
 
       return {
         ...nav,
@@ -40,13 +38,13 @@ export const homeScreen: any = {
           startIndex: nav.startIndex - 1
         }
 
-      if(nextFlag && nav.highlightedIndex == MAX_LIST_ITEMS + (prevFlag ? 1 : 0))
+      if(nextFlag && nav.highlightedIndex == MAX_NOVEL_LIST_LENGTH + (prevFlag ? 1 : 0))
         return {
           ...nav,
           startIndex: nav.startIndex + 1
         }
 
-      const selected = snapshot?.buttons?.[(nav.startIndex * MAX_LIST_ITEMS) + nav.highlightedIndex - (prevFlag ? 1 : 0)]
+      const selected = snapshot?.buttons?.[(nav.startIndex * MAX_NOVEL_LIST_LENGTH) + nav.highlightedIndex - (prevFlag ? 1 : 0)]
       if (!selected) {
         return nav
       }
@@ -65,10 +63,10 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
   
   const navIndex = nav.startIndex ?? 0
   let prevFlag = nav.startIndex > 0
-  let nextFlag = (buttons.length / MAX_LIST_ITEMS) > (nav.startIndex + 1)
+  let nextFlag = (buttons.length / MAX_NOVEL_LIST_LENGTH) > (nav.startIndex + 1)
 
   let names = buttons
-    .slice(MAX_LIST_ITEMS*navIndex, MAX_LIST_ITEMS*(navIndex+1))
+    .slice(MAX_NOVEL_LIST_LENGTH*navIndex, MAX_NOVEL_LIST_LENGTH*(navIndex+1))
     .map((b) => truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH))
 
   if(prevFlag) {
