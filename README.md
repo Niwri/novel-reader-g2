@@ -10,10 +10,10 @@ React, Vite.js
 - **JSZip** for parsing EPUB files
 
 ## Features to Add
-- Adding "Continue Reading" feature
 - Adding novels via webnovel links, akin to [WebToEpub](https://github.com/dteviot/WebToEpub)
+- Add voice assistant to navigate through novels
 
 ## Steps to run
 1. `npm run dev`
-2. `evenhub-simulator http://localhost:5173`
-3. `evenhub qr --url "http://<YOUR-LAN-IP>:5173"`
+2. `evenhub-simulator http://localhost:5174`
+3. `evenhub qr --url "http://<YOUR-IPV4>:5174"`
