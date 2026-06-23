@@ -263,7 +263,6 @@ function updateChapterScroll(nav: any, snapshot: AppSnapshot, direction: 'up' | 
   const current = buildWindowInfo(body, scrollState.chapterScrollOffset ?? 0, availableBodyChars)
   const atStart = current.offset <= 0
   const atEnd = current.offset >= current.maxOffset
-  console.log("Offset:", current.offset, current.maxOffset, direction, current.maxOffset)
 
   if (direction === 'up') {
     if (atStart) {
@@ -283,7 +282,6 @@ function updateChapterScroll(nav: any, snapshot: AppSnapshot, direction: 'up' | 
     }
 
     const nextOffset = shiftWindowOffset(body, current, 'up', availableBodyChars)
-    console.log("Next offset:", nextOffset)
     ctx.setPosition(nextOffset)
 
     ctx.updatePosition({
@@ -300,7 +298,6 @@ function updateChapterScroll(nav: any, snapshot: AppSnapshot, direction: 'up' | 
 
   if (!atEnd) {
     const nextOffset = shiftWindowOffset(body, current, 'down', availableBodyChars)
-    console.log("Next offset:", nextOffset)
     ctx.setPosition(nextOffset)
 
     ctx.updatePosition({
@@ -401,7 +398,6 @@ export function buildChapterRebuildContainer(snapshot: AppSnapshot, nav: any, co
   const { body, availableBodyChars } = getChapterParts(snapshot)
   const scrollState = getScrollState(nav)
   const windowedBody = buildWindowInfo(body, scrollState.chapterScrollOffset ?? 0, availableBodyChars).content
-  console.log("Window:", windowedBody)
 
   const menu = new ListContainerProperty({
     xPosition: DISPLAY_W/2 - 10*10,

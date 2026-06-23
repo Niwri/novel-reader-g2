@@ -53,8 +53,6 @@ export const chapterListScreen: any = {
 
       // Drill down into the selected range.
       const nextStack = [...stack, { start: selected.start, count: selected.count }]
-      console.log("Selected:", selected)
-      console.log("Current stack:", nextStack)
       return { ...nav, highlightedIndex: 0, chapterListStack: nextStack }
     }
 
@@ -162,7 +160,6 @@ function getChapterListEntries(snapshot: AppSnapshot, nav: any): ChapterListEntr
     if (groups.length >= maxGroups) break
   }
 
-  console.log("Group:", groups)
   return groups
 }
 
