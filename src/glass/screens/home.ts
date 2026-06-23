@@ -14,15 +14,18 @@ export const homeScreen: any = {
   },
 
   action(action: any, nav: any, snapshot: AppSnapshot, ctx: AppActions) {
-    let padding = 0
-    if(snapshot?.buttons && snapshot?.buttons?.length > MAX_LIST_ITEMS) {
-      padding = 1
-      if(nav.startIndex && nav.startIndex > 0)
-        padding = 2
-    }
+
+    if(!snapshot)
+      return nav
+
+    if(!snapshot.buttons)
+      return nav
+
+    let prevFlag = nav.startIndex > 0
+    let nextFlag = (snapshot.buttons.length / MAX_LIST_ITEMS) > (nav.startIndex + 1)
     
     if (action.type === 'HIGHLIGHT_MOVE') {
-      const maxHighlightIndex = Math.max(MAX_LIST_ITEMS - 1 + padding, 0)
+      const maxHighlightIndex = Math.max(MAX_LIST_ITEMS - 1 + (prevFlag ? 1 : 0) + (nextFlag ? 1 : 0), 0)
 
       return {
         ...nav,
@@ -31,25 +34,19 @@ export const homeScreen: any = {
     }
 
     if (action.type === 'SELECT_HIGHLIGHTED') { 
-      if(padding == 2 && nav.highlightedIndex == 0)
+      if(prevFlag && nav.highlightedIndex == 0)
         return {
           ...nav,
           startIndex: nav.startIndex - 1
         }
 
-      if(padding == 2 && nav.highlightedIndex == MAX_LIST_ITEMS + 1)
-        return {
-          ...nav,
-          startIndex: nav.startIndex + 1
-        }
-      
-      if(padding == 1 && nav.highlightedIndex == MAX_LIST_ITEMS)
+      if(nextFlag && nav.highlightedIndex == MAX_LIST_ITEMS + (prevFlag ? 1 : 0))
         return {
           ...nav,
           startIndex: nav.startIndex + 1
         }
 
-      const selected = snapshot?.buttons?.[(nav.startIndex && nav.startIndex * MAX_LIST_ITEMS) + nav.highlightedIndex - (padding == 2 ? 1 : 0)]
+      const selected = snapshot?.buttons?.[(nav.startIndex * MAX_LIST_ITEMS) + nav.highlightedIndex - (prevFlag ? 1 : 0)]
       if (!selected) {
         return nav
       }
@@ -66,16 +63,20 @@ export const homeScreen: any = {
 export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, containerID = 1) {
   const buttons = snapshot?.buttons ?? []
   
-  const exceedFlag = buttons.length > MAX_LIST_ITEMS
   const navIndex = nav.startIndex ?? 0
+  let prevFlag = nav.startIndex > 0
+  let nextFlag = (buttons.length / MAX_LIST_ITEMS) > (nav.startIndex + 1)
 
   let names = buttons
     .slice(MAX_LIST_ITEMS*navIndex, MAX_LIST_ITEMS*(navIndex+1))
     .map((b) => truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH))
 
-  if(exceedFlag) {
-    names = [...names, "Next Chapter"]
+  if(prevFlag) {
+    names = ["[ Previous Page ] ", ...names]
   }
+
+  if(nextFlag)
+    names = [...names, "[ Next Page ]"]
   
   
   const header = 'Pick Your Novel'

@@ -1,5 +1,7 @@
 import { ChapterPosition } from "@/types/novelTypes"
 
+export const GLASSES_CHAPTER_LIST_MAX_ITEMS = 10
+
 export interface AppButton {
   label: string
   index: number
@@ -12,6 +14,8 @@ export interface AppSnapshot {
   texts?: string[]
   chapterIndex?: number
   chapterCount?: number
+  continueChapterIndex?: number
+  continueCharOffset?: number
   flashPhase: boolean
 }
 
@@ -20,10 +24,11 @@ export interface AppActions {
   selectNovel: (index: number) => Promise<void>
   checkLoadedChapters: () => Promise<Boolean>
   selectChapter: (index: number) => Promise<void>
+  setPosition: (charOffset: number) => Promise<void>
   updatePosition: (chapterPos: ChapterPosition) => Promise<void>
 }
 
-export const LINE_WIDTH = 53
+export const LINE_WIDTH = 56
 
 export function normalizeLabel(label: string) {
   return label.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ').trim()

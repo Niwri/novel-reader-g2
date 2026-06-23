@@ -8,6 +8,7 @@ interface NovelState {
     selectedNovel: Novel | null
     selectedChapterList: ChapterContent[]
     selectedChapterIndex: number
+    selectedChapterOffset: number
 }
 
 // --- Actions ---
@@ -19,6 +20,7 @@ type NovelAction =
     | { type: 'UPDATE'; novel: Novel}
     | { type: 'SET_CHAPTERS', selectedChapterList: ChapterContent[]}
     | { type: 'SET_CHAPTER_INDEX', selectedChapterIndex: number}
+    | { type: 'SET_CHAPTER_OFFSET', selectedChapterOffset: number}
 
 // --- Context Value ---
 interface NovelContextValue {
@@ -26,12 +28,14 @@ interface NovelContextValue {
     selectedNovel: Novel | null
     selectedChapterList: ChapterContent[]
     selectedChapterIndex: number
+    selectedChapterOffset: number
     loaded: boolean
     setSelectedNovel: (novel: Novel) => Promise<Novel>
     addNovel: (novel: Novel) => Promise<void>
     removeNovel: (novel: Novel) => Promise<void>
     updateNovel: (novel: Novel) => Promise<void>
     updatePosition: (chapterPos: ChapterPosition) => Promise<void>
+    setPosition: (chapterOffset: number) => Promise<void>
     setChapterList: (chapters: ChapterContent[]) => void
     setChapter: (chapterIndex: number) => void
 }
@@ -54,6 +58,8 @@ export function novelReducer(state: NovelState, action: NovelAction): NovelState
             return { ...state, selectedChapterList: action.selectedChapterList}
         case 'SET_CHAPTER_INDEX':
             return {...state, selectedChapterIndex: action.selectedChapterIndex}
+        case 'SET_CHAPTER_OFFSET':
+            return {...state, selectedChapterOffset: action.selectedChapterOffset}
         default:
             return state
     }
@@ -65,7 +71,8 @@ export function NovelProvider({children}: {children: ReactNode}) {
         novels: [], 
         selectedNovel: null,
         selectedChapterList: [],
-        selectedChapterIndex: -1
+        selectedChapterIndex: -1,
+        selectedChapterOffset: 0
     })
 
     const [loaded, setLoaded] = useState(false)
@@ -86,6 +93,7 @@ export function NovelProvider({children}: {children: ReactNode}) {
         selectedNovel: state.selectedNovel,
         selectedChapterList: state.selectedChapterList,
         selectedChapterIndex: state.selectedChapterIndex,
+        selectedChapterOffset: state.selectedChapterOffset,
         loaded: loaded,
         setSelectedNovel: async (novel) => {
             let resolved: Novel = novel
@@ -145,7 +153,10 @@ export function NovelProvider({children}: {children: ReactNode}) {
                     throw e
                 }
             } else return 
-        }
+        },
+        setPosition: async (chapterOffset) => {
+            dispatch({ type: 'SET_CHAPTER_OFFSET', selectedChapterOffset: chapterOffset})
+        },
     }
 
     return <NovelContext.Provider value={value}>{children}</NovelContext.Provider>

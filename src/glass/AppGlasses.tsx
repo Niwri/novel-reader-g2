@@ -65,7 +65,7 @@ export function AppGlasses() {
   const location = useLocation()
   const screen = deriveScreen(location.pathname)
   const flashPhase = useFlashPhase(screen === 'home' || screen === 'chapter-list')
-  const { novels, loaded, selectedNovel, selectedChapterList, selectedChapterIndex, setChapterList, setSelectedNovel, setChapter, updatePosition } = useNovelContext()
+  const { novels, loaded, selectedNovel, selectedChapterList, selectedChapterIndex, selectedChapterOffset, setChapterList, setSelectedNovel, setChapter, setPosition: setChapterOffset, updatePosition } = useNovelContext()
 
   const [chapterTexts, setChapterTexts] = useState<string[]>([])
 
@@ -97,20 +97,24 @@ export function AppGlasses() {
   const getSnapshotForScreen = useCallback(
     (s: string): AppSnapshot => {
       if (s === 'chapter-list') {
+        const continueChapterIndex = selectedNovel?.lastPosition?.chapterIndex ?? -1
+        const continueCharOffset = selectedNovel?.lastPosition?.charOffset ?? 0
+
         return {
-          buttons: selectedChapterList.map((chapter, index) => {
+          buttons: selectedChapterList.map((chapter) => {
             return {
               label: chapter.name,
-              index,
+              index: chapter.chapterIndex,
               target: '/chapter',
             }
           }),
+          continueChapterIndex,
+          continueCharOffset,
           flashPhase,
         }
       }
 
       if (s === 'chapter') {
-        chapterRef.current = selectedChapterIndex
         return {
           texts: chapterTexts,
           title: selectedChapterList[selectedChapterIndex]?.name ?? '',
@@ -131,7 +135,7 @@ export function AppGlasses() {
         flashPhase,
       }
     },
-    [chapterTexts, flashPhase, novels, selectedChapterIndex, selectedChapterList],
+    [chapterTexts, flashPhase, novels, selectedChapterIndex, selectedChapterList, selectedNovel],
   )
 
   const ctxRef = useRef<AppActions>({
@@ -139,6 +143,7 @@ export function AppGlasses() {
     selectNovel: async () => {},
     checkLoadedChapters: async () => {return false},
     selectChapter: async () => {},
+    setPosition: async () => {},
     updatePosition: async (chapterPos: ChapterPosition) => {}
   })
 
@@ -152,6 +157,15 @@ export function AppGlasses() {
         throw new Error('Selected novel is missing epubBlob')
       }
       const chapters = await getChapterList(resolved.epubBlob)
+
+      if(selectedNovel && selectedNovel.lastPosition) {
+        chapters.unshift({
+          name: "Continue",
+          chapterIndex: -1,
+          chapterPath: ""
+        })
+      }
+
       await setChapterList(chapters)
     },
     checkLoadedChapters: async () => {
@@ -161,6 +175,9 @@ export function AppGlasses() {
     },
     selectChapter: async (index: number) => {
       await setChapter(index)
+    },
+    setPosition: async (charOffset: number) => {
+      await setChapterOffset(charOffset)
     },
     updatePosition: async (chapterPos: ChapterPosition) => {
       await updatePosition(chapterPos)
@@ -240,7 +257,6 @@ export function AppGlasses() {
         const nav: GlassNavState = { ...navRef.current, screen: currentScreen }
         const snap = getSnapshotForScreenRef.current(currentScreen)
 
-        // Clamp highlight for list screens.
         if (currentScreen === 'home' || currentScreen === 'chapter-list') {
           const maxHighlightIndex = Math.max((snap.buttons?.length ?? 0) - 1, 0)
           nav.highlightedIndex = Math.max(0, Math.min(nav.highlightedIndex, maxHighlightIndex))
@@ -251,7 +267,6 @@ export function AppGlasses() {
           navRef.current = {
             ...navRef.current,
             toggleMenu: false,
-            chapterScrollOffset: 0,
             chapterEndAttempts: 0
           }
           lastChapterRef.current = chapterRef.current
@@ -342,7 +357,7 @@ export function AppGlasses() {
 
 
         unsubscribe = bridge.onEvenHubEvent((event) => {
-          const tappedIndex = event?.listEvent?.currentSelectItemIndex
+          const tappedIndex = event?.listEvent?.currentSelectItemIndex ?? 0
           if (typeof tappedIndex === 'number' && Number.isFinite(tappedIndex)) {
             navRef.current = { ...navRef.current, highlightedIndex: tappedIndex }
           }
@@ -373,9 +388,17 @@ export function AppGlasses() {
 
   useEffect(() => {
     // On route change, reset highlight and rebuild the page container for that screen.
-    navRef.current = { highlightedIndex: 0, screen, startIndex: 0 }
+    navRef.current = {
+      ...navRef.current,
+      highlightedIndex: 0,
+      screen,
+      chapterScrollOffset: screen === 'chapter' ? selectedChapterOffset : 0,
+      chapterEndAttempts: screen === 'chapter' ? navRef.current.chapterEndAttempts ?? 0 : 0,
+      ...(screen === 'chapter-list' ? { chapterListStack: undefined } : {}),
+      ...(screen !== 'chapter' ? { toggleMenu: false } : {}),
+    }
     scheduleRender()
-  }, [screen, scheduleRender, novels, loaded, selectedChapterList])
+  }, [screen, scheduleRender, novels, loaded, selectedChapterList, selectedChapterOffset])
 
   useEffect(() => {
     if (screen === 'chapter') {
