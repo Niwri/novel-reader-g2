@@ -10,13 +10,24 @@ import { getChapterList } from '@/data/novel'
 
 export function ChapterList() {
     const navigate = useNavigate()
-    const { selectedNovel, selectedChapterList, selectedChapterIndex, setChapterList, setChapter} = useNovelContext()
+    const { selectedNovel, selectedChapterList, selectedChapterIndex, setChapterList, setChapter, updatePosition, setPosition} = useNovelContext()
     
     const [loadedChaptersState, setLoadedChaptersState] = useState(false)
+    const [renderedChapterList, setRenderedChapterList] = useState<ChapterContent[]>([])
     const [failed, setFailed] = useState(false)
 
     const [toastMessage, setToastMessage] = useState("")
     const [showToast, setShowToast] = useState(false)
+
+    useEffect(() => {
+        if(selectedNovel?.lastPosition) {
+            setRenderedChapterList([{
+                name: "Continue at: " + selectedChapterList[selectedNovel.lastPosition.chapterIndex].name,
+                chapterIndex: -1,
+                chapterPath: ""
+            }, ...selectedChapterList])
+        }
+    }, [selectedNovel?.lastPosition])
 
     useEffect(() => {
         if (!selectedNovel?.epubBlob) return
@@ -25,6 +36,17 @@ export function ChapterList() {
             try {
                 const chapters = await getChapterList(selectedNovel.epubBlob as Blob)
                 await setChapterList(chapters)
+                
+                if(selectedNovel && selectedNovel.lastPosition) {
+                    setRenderedChapterList([{
+                        name: "Continue at: " + chapters[selectedNovel.lastPosition.chapterIndex].name,
+                        chapterIndex: -1,
+                        chapterPath: ""
+                    }, ...chapters])
+                } else {
+                    setRenderedChapterList(chapters)
+                }
+
                 setLoadedChaptersState(true)
             } catch (e) {
                 console.error('Failed to load chapters', e)
@@ -38,8 +60,19 @@ export function ChapterList() {
     const selectChapter = (index: number) => {
         const select = async () => {
             try {
-                setChapter(index)
-                console.log(selectedChapterIndex)
+                
+                // Condition where "Continue" was pressed
+                if(index == -1 && selectedNovel && selectedNovel.lastPosition) {
+                    setChapter(selectedNovel.lastPosition.chapterIndex)
+                    await setPosition(selectedNovel.lastPosition.charOffset)
+                } else {
+                    setChapter(index)
+                    await setPosition(0)
+                    updatePosition({
+                        chapterIndex: index,
+                        charOffset: 0
+                    })
+                }
                 navigate("/chapter")
             } catch {
                 setToastMessage("Failed to load chapter!")
@@ -49,7 +82,6 @@ export function ChapterList() {
         }
         void select()
     }
-
 
     return (
         <AppShell header={<></>}>
@@ -66,12 +98,12 @@ export function ChapterList() {
                 <Page className="flex flex-col gap-y-4 mt-4">
                     {!loadedChaptersState && !failed && "Loading..."}
                     {failed && "Failed to load chapters!"}
-                    {loadedChaptersState && selectedChapterList.map((chapterContent, index) => {
+                    {loadedChaptersState && renderedChapterList.map((chapterContent, index) => {
                         return (
                             <Card variant="elevated" className="flex items-center gap-x-2">
-                                <button className="flex-1 min-w-0" onClick={() => {selectChapter(index)}}>
+                                <button className="flex-1 min-w-0" onClick={() => {selectChapter(chapterContent.chapterIndex)}}>
                                     <ListItem
-                                        leading={<h2>{index}</h2>}
+                                        leading={chapterContent.chapterIndex != -1 ? <h2>{chapterContent.chapterIndex}</h2> : ""}
                                         title={chapterContent.name}
                                         className="p-0"
                                         trailing={<IcGuideGo width={20} height={20}/>}

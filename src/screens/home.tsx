@@ -6,6 +6,33 @@ import { useNovelContext } from '../contexts/novelContext'
 import { Popup } from '@/components/popup'
 import type { Novel } from '../types/novelTypes'
 
+function formatLastRead(isoString: string): string {
+    const date = new Date(isoString)
+    const now = new Date()
+
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) {
+        return "Today"
+    }
+
+    if (diffDays === 1) {
+        return "1 day ago"
+    }
+
+    if (diffDays <= 7) {
+        return `${diffDays} days ago`
+    }
+
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+
+    return `${day}-${month}-${year}`
+}
+
+
 export function Home() {
   const navigate = useNavigate()
   const { novels, removeNovel, setSelectedNovel } = useNovelContext()
@@ -44,7 +71,7 @@ export function Home() {
                         <img src={novel.coverImage ?? undefined} alt="" width={40} height={40} className="rounded-xl flex-shrink-0"/>
                       }
                       title={novel.title}
-                      subtitle={novel.lastReadAt?.toDateString() ?? "Not Yet Read"}
+                      subtitle={novel.lastReadAt ? formatLastRead(novel.lastReadAt) : "Not Yet Read"}
                       trailing={
                         <Button variant="highlight" size="sm" onClick={() => handleNovelSelect(novel)}>
                           Read <IcGuideGo width={15} height={15}/>

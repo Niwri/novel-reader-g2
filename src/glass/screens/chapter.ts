@@ -224,6 +224,11 @@ function advanceToNextChapter(snapshot: AppSnapshot, ctx: AppActions) {
   if (chapterIndex >= chapterCount - 1) return false
 
   const next = chapterIndex + 1
+  
+  ctx.updatePosition({
+    chapterIndex: next,
+    charOffset: 0
+  })
 
   void ctx.selectChapter(next).then(() => {
     ctx.navigate('/chapter')
@@ -240,6 +245,11 @@ function advanceToPreviousChapter(snapshot: AppSnapshot, ctx: AppActions) {
 
   const prev = chapterIndex - 1
 
+  ctx.updatePosition({
+    chapterIndex: prev,
+    charOffset: 0
+  })
+
   void ctx.selectChapter(prev).then(() => {
     ctx.navigate('/chapter')
   })
@@ -253,7 +263,6 @@ function updateChapterScroll(nav: any, snapshot: AppSnapshot, direction: 'up' | 
   const current = buildWindowInfo(body, scrollState.chapterScrollOffset ?? 0, availableBodyChars)
   const atStart = current.offset <= 0
   const atEnd = current.offset >= current.maxOffset
-  console.log(current.offset, current.maxOffset)
 
   if (direction === 'up') {
     if (atStart) {
@@ -273,6 +282,13 @@ function updateChapterScroll(nav: any, snapshot: AppSnapshot, direction: 'up' | 
     }
 
     const nextOffset = shiftWindowOffset(body, current, 'up', availableBodyChars)
+    ctx.setPosition(nextOffset)
+
+    ctx.updatePosition({
+      chapterIndex: snapshot.chapterIndex ?? 0,
+      charOffset: nextOffset
+    })
+
     return {
       ...nav,
       chapterScrollOffset: nextOffset,
@@ -282,6 +298,13 @@ function updateChapterScroll(nav: any, snapshot: AppSnapshot, direction: 'up' | 
 
   if (!atEnd) {
     const nextOffset = shiftWindowOffset(body, current, 'down', availableBodyChars)
+    ctx.setPosition(nextOffset)
+
+    ctx.updatePosition({
+      chapterIndex: snapshot.chapterIndex ?? 0,
+      charOffset: nextOffset
+    })
+    
     return {
       ...nav,
       chapterScrollOffset: nextOffset,
@@ -408,7 +431,7 @@ export function buildChapterRebuildContainer(snapshot: AppSnapshot, nav: any, co
     borderColor: 8,
     borderRadius: 10,
     borderWidth: 1,
-    paddingLength: 30,
+    paddingLength: 15,
     containerID,
     containerName: 'chapter',
     content: windowedBody,
