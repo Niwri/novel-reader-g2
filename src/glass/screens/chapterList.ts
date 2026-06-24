@@ -2,7 +2,7 @@ import type { AppSnapshot, AppActions } from '../shared'
 import { moveHighlight } from 'even-toolkit/glass-nav'
 import { RebuildPageContainer, ListContainerProperty, ListItemContainerProperty } from '@evenrealities/even_hub_sdk'
 import { DISPLAY_H, DISPLAY_W } from 'even-toolkit/layout'
-import { truncateLabel, LINE_WIDTH } from '../shared'
+import { truncateLabel, LINE_WIDTH, GLASSES_CHAPTER_LIST_MAX_ITEMS } from '../shared'
 
 export const chapterListScreen: any = {
   display(snapshot: AppSnapshot, nav: any) {
@@ -25,25 +25,42 @@ export const chapterListScreen: any = {
       const selected = entries[safeHighlight]
       if (!selected) return { ...nav, highlightedIndex: safeHighlight }
 
+      const stack = getStack(nav, snapshot)
+      const continueChapterIndex = Number(snapshot?.continueChapterIndex ?? -1)
+      const continueCharOffset = Math.max(0, Number(snapshot?.continueCharOffset ?? 0))
+
       if (selected.kind === 'chapter') {
-        void ctx.selectChapter(selected.chapterIndex).then(() => {
-          ctx.navigate('/chapter')
-        })
+        if (selected.chapterIndex === -1) {
+          if (continueChapterIndex >= 0) {
+            void ctx.setPosition(continueCharOffset)
+            void ctx.selectChapter(continueChapterIndex).then(() => {
+              ctx.navigate('/chapter')
+            })
+          }
+        } else {
+          void ctx.setPosition(0)
+          void ctx.updatePosition({
+            chapterIndex: selected.chapterIndex,
+            charOffset: 0,
+          })
+          void ctx.selectChapter(selected.chapterIndex).then(() => {
+            ctx.navigate('/chapter')
+          })
+        }
 
         return { ...nav, highlightedIndex: safeHighlight }
       }
 
       // Drill down into the selected range.
-      const stack = getStack(nav, snapshot)
-      stack.push({ start: selected.start, count: selected.count })
-      return { ...nav, highlightedIndex: 0, chapterListStack: stack }
+      const nextStack = [...stack, { start: selected.start, count: selected.count }]
+      return { ...nav, highlightedIndex: 0, chapterListStack: nextStack }
     }
 
     if (action.type === 'GO_BACK') {
       const stack = getStack(nav, snapshot)
       if (stack.length > 1) {
-        stack.pop()
-        return { ...nav, highlightedIndex: 0, chapterListStack: stack }
+        const nextStack = stack.slice(0, -1)
+        return { ...nav, highlightedIndex: 0, chapterListStack: nextStack }
       }
       ctx.navigate('/')
       return nav
@@ -65,14 +82,13 @@ function getStack(nav: any, snapshot: AppSnapshot): ChapterListStackFrame[] {
 
   if (!Array.isArray(raw) || raw.length === 0)
     return [{ start: 0, count: total }]
-  
 
-  return raw
+  return raw.slice()
 }
 
 function computeChunkSize(count: number): number {
-  if (count <= 10) return 1
-  const raw = count / 10
+  if (count <= GLASSES_CHAPTER_LIST_MAX_ITEMS) return 1
+  const raw = count / GLASSES_CHAPTER_LIST_MAX_ITEMS
   const exp = Math.ceil(Math.log10(raw))
   return Math.pow(10, Math.max(1, exp))
 }
@@ -87,26 +103,61 @@ function getChapterListEntries(snapshot: AppSnapshot, nav: any): ChapterListEntr
   const safeStart = Math.max(0, Math.min(start, Math.max(total - 1, 0)))
   const safeEndExclusive = Math.min(total, safeStart + Math.max(0, count))
   const safeCount = Math.max(0, safeEndExclusive - safeStart)
-
-  if (safeCount <= 10) {
+  const isRootRange = stack.length <= 1 && safeStart === 0 && safeEndExclusive === total
+  const continueChapterIndex = Number(snapshot?.continueChapterIndex ?? -1)
+  const hasContinueAtRoot = isRootRange && continueChapterIndex >= 0
+  const continueLabel = hasContinueAtRoot
+    ? truncateLabel(
+        `Continue at: ${String(buttons[continueChapterIndex]?.label ?? 'Saved position')}`,
+        LINE_WIDTH,
+      )
+    : ''
+    
+  if (safeCount <= GLASSES_CHAPTER_LIST_MAX_ITEMS) {
     const slice = buttons.slice(safeStart, safeEndExclusive)
-    return slice.map((b, i) => ({
+    const chapterEntries: ChapterListEntry[] = slice.map((b) => ({
       kind: 'chapter',
       label: truncateLabel(String(b.label ?? ''), LINE_WIDTH),
-      chapterIndex: safeStart + i,
+      chapterIndex: Number(b.index ?? -1),
     }))
+
+    if (hasContinueAtRoot) {
+      return [
+        {
+          kind: 'chapter',
+          label: continueLabel,
+          chapterIndex: -1,
+        },
+        ...chapterEntries,
+      ]
+    }
+
+    return chapterEntries
   }
 
   const chunkSize = computeChunkSize(safeCount)
   const groups: ChapterListEntry[] = []
-  for (let groupStart = safeStart; groupStart < safeEndExclusive; groupStart += chunkSize) {
+  let firstGroupStart = safeStart
+  let maxGroups = GLASSES_CHAPTER_LIST_MAX_ITEMS
+
+  if (hasContinueAtRoot) {
+    groups.push({
+      kind: 'chapter',
+      label: continueLabel,
+      chapterIndex: -1,
+    })
+    firstGroupStart = safeStart
+    maxGroups = GLASSES_CHAPTER_LIST_MAX_ITEMS - 1
+  }
+
+  for (let groupStart = firstGroupStart; groupStart < safeEndExclusive; groupStart += chunkSize) {
     const groupEndExclusive = Math.min(safeEndExclusive, groupStart + chunkSize)
     const groupCount = groupEndExclusive - groupStart
     if (groupCount <= 0) continue
 
     const label = `Sections ${groupStart}-${groupEndExclusive - 1}`
     groups.push({ kind: 'range', label, start: groupStart, count: groupCount })
-    if (groups.length >= 10) break
+    if (groups.length >= maxGroups) break
   }
 
   return groups
