@@ -32,6 +32,7 @@ interface NovelContextValue {
     selectedChapterOffset: number
     loaded: boolean
     setSelectedNovel: (novel: Novel) => Promise<Novel>
+    getAllNovels: () => Promise<Novel[]>
     addNovel: (novel: Novel) => Promise<void>
     removeNovel: (novel: Novel) => Promise<void>
     updateNovel: (novel: Novel) => Promise<void>
@@ -177,6 +178,11 @@ export function NovelProvider({children}: {children: ReactNode}) {
         },
         clearState: async () => {
             dispatch({ type: 'CLEAR'})
+        },
+        getAllNovels: async () => {
+            const novels = await getAllNovels()
+            dispatch({ type: 'INIT', novels })
+            return novels
         }
     }
 

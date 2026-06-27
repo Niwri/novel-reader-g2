@@ -106,7 +106,7 @@ async function getEPUBInfo(file: File): Promise<EpubInfo> {
 
 export function AddNovel() {
     const navigate = useNavigate()
-    const { addNovel } = useNovelContext()
+    const { addNovel, getAllNovels } = useNovelContext()
 
     const ref = useRef<HTMLInputElement>(null)
     const [file, setFile] = useState<File | null>(null);
@@ -118,6 +118,18 @@ export function AddNovel() {
         data: null,
         numOfChapters: -1
     })
+
+    const displayToastMessage = (text: string, delay: number) => {
+        setToastMessage(text)
+        setSaving(false)
+        setShowToast(true)
+        setTimeout(() => {setShowToast(false)}, delay)
+    }
+
+    const checkNovelDuplicate = async (novel: Novel) => {
+        const storedNovels = await getAllNovels()
+        return storedNovels.some((storedNovel) => storedNovel.id === novel.id)
+    }
 
     const handleFileClick = () => {
         ref.current?.click()
@@ -163,13 +175,14 @@ export function AddNovel() {
         const novel = novelInfo.data
         setSaving(true)
         try {
+            if (await checkNovelDuplicate(novel)) {
+                displayToastMessage('Novel already exists!', 2000)
+                return
+            }
             await addNovel(novel)
             navigate("/")
         } catch (err) {
-            setToastMessage("Failed to add!")
-            setSaving(false)
-            setShowToast(true)
-            setTimeout(() => {setShowToast(false)}, 2000)
+            displayToastMessage("Failed to add!", 2000)
         } finally {
         }
     }
