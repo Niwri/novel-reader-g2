@@ -54,6 +54,11 @@ export const homeScreen: any = {
       })
     }
 
+    
+    if (action.type === 'GO_BACK') { // Exits application
+      ctx.exitApp()
+    }
+
     return nav
   },
 }

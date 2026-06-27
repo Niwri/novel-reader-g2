@@ -27,6 +27,7 @@ export interface AppActions {
   selectChapter: (index: number) => Promise<void>
   setPosition: (charOffset: number) => Promise<void>
   updatePosition: (chapterPos: ChapterPosition) => Promise<void>
+  exitApp: () => Promise<void>
 }
 
 export const LINE_WIDTH = 56

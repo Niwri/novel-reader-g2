@@ -230,6 +230,8 @@ function advanceToNextChapter(snapshot: AppSnapshot, ctx: AppActions) {
     charOffset: 0
   })
 
+  ctx.setPosition(0)
+
   void ctx.selectChapter(next).then(() => {
     ctx.navigate('/chapter')
   })
@@ -250,6 +252,8 @@ function advanceToPreviousChapter(snapshot: AppSnapshot, ctx: AppActions) {
     charOffset: 0
   })
 
+  ctx.setPosition(0)
+  
   void ctx.selectChapter(prev).then(() => {
     ctx.navigate('/chapter')
   })

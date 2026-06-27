@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { waitForEvenAppBridge, CreateStartUpPageContainer, type EvenAppBridge, TextContainerProperty } from '@evenrealities/even_hub_sdk'
+import { waitForEvenAppBridge, CreateStartUpPageContainer, type EvenAppBridge, TextContainerProperty, OsEventTypeList } from '@evenrealities/even_hub_sdk'
 import { mapGlassEvent } from 'even-toolkit/action-map'
 import { createScreenMapper } from 'even-toolkit/glass-router'
 import { notifyTextUpdate } from 'even-toolkit/gestures'
@@ -21,6 +21,46 @@ import { ChapterPosition } from '@/types/novelTypes'
 
 const DISPLAY_W = 576
 const DISPLAY_H = 288
+
+let startupContainerCreated = false
+let startupContainerCreatePromise: Promise<number> | null = null
+
+async function ensureStartupContainer(bridge: EvenAppBridge): Promise<number> {
+  if (startupContainerCreated) {
+    return 0
+  }
+
+  if (!startupContainerCreatePromise) {
+    startupContainerCreatePromise = bridge.createStartUpPageContainer(
+      new CreateStartUpPageContainer({
+        containerTotalNum: 1,
+        listObject: [],
+        textObject: [
+          new TextContainerProperty({
+            xPosition: DISPLAY_W / 2 - 5 * 10,
+            yPosition: DISPLAY_H / 2 - 25,
+            width: 100,
+            height: 50,
+            containerID: 1,
+            containerName: 'loading',
+            content: 'Loading...',
+            isEventCapture: 0,
+          }),
+        ],
+        imageObject: [],
+      }),
+    )
+  }
+
+  const status = await startupContainerCreatePromise
+  if (status === 0) {
+    startupContainerCreated = true
+  } else {
+    startupContainerCreatePromise = null
+  }
+
+  return status
+}
 
 type ChapterGlassNavState = GlassNavState & {
   toggleMenu?: Boolean
@@ -65,7 +105,20 @@ export function AppGlasses() {
   const location = useLocation()
   const screen = deriveScreen(location.pathname)
   const flashPhase = useFlashPhase(screen === 'home' || screen === 'chapter-list')
-  const { novels, loaded, selectedNovel, selectedChapterList, selectedChapterIndex, selectedChapterOffset, setChapterList, setSelectedNovel, setChapter, setPosition: setChapterOffset, updatePosition } = useNovelContext()
+  const { 
+    novels, 
+    loaded, 
+    selectedNovel, 
+    selectedChapterList, 
+    selectedChapterIndex, 
+    selectedChapterOffset, 
+    setChapterList, 
+    setSelectedNovel, 
+    setChapter, 
+    setPosition: setChapterOffset, 
+    updatePosition, 
+    clearState
+   } = useNovelContext()
 
   const [chapterTexts, setChapterTexts] = useState<string[]>([])
 
@@ -144,7 +197,8 @@ export function AppGlasses() {
     checkLoadedChapters: async () => {return false},
     selectChapter: async () => {},
     setPosition: async () => {},
-    updatePosition: async (chapterPos: ChapterPosition) => {}
+    updatePosition: async (chapterPos: ChapterPosition) => {},
+    exitApp: async () => {}
   })
 
   ctxRef.current = {
@@ -181,6 +235,22 @@ export function AppGlasses() {
     },
     updatePosition: async (chapterPos: ChapterPosition) => {
       await updatePosition(chapterPos)
+    },
+    exitApp: async () => {
+      if (screenRef.current === 'chapter' && selectedChapterIndex >= 0) {
+        const latestOffset = Math.max(
+          0,
+          Number(navRef.current.chapterScrollOffset ?? selectedChapterOffset ?? 0),
+        )
+
+        await updatePosition({
+          chapterIndex: selectedChapterIndex,
+          charOffset: latestOffset,
+        })
+      }
+
+      await bridgeRef.current?.shutDownPageContainer(1)
+
     }
   }
 
@@ -316,8 +386,30 @@ export function AppGlasses() {
     [handleGlassAction, scheduleRender],
   )
 
+  const resetApp = () => {
+    startupContainerCreated = false
+    startupContainerCreatePromise = null
+    
+    clearState()
+    renderInProgressRef.current = false
+    renderQueuedRef.current = false
+    navRef.current = {
+      highlightedIndex: 0,
+      screen: "home",
+      startIndex: 0
+    },
+    lastRenderedRef.current = {
+      screen: "",
+      content: ""
+    },
+    lastChapterRef.current = -1
+    setChapterTexts([])
+    chapterRef.current = -1
+  }
+
+  const unsubscribeRef = useRef<(() => void) | null>(null)
+
   useEffect(() => {
-    let unsubscribe: null | (() => void) = null
     let disposed = false
 
     if(loadedRef.current)
@@ -334,29 +426,28 @@ export function AppGlasses() {
 
         // Startup must begin with the home page (using the same data model as rebuild).
         // Loading page
-        await bridge.createStartUpPageContainer(
-          new CreateStartUpPageContainer({
-            containerTotalNum: 1,
-            listObject: [],
-            textObject: [
-              new TextContainerProperty({
-                xPosition: DISPLAY_W/2 - 5*10,
-                yPosition: DISPLAY_H/2-25,
-                width: 100,
-                height: 50,
-                containerID: 100,
-                containerName: 'loading',
-                content: 'Loading...',
-                isEventCapture: 0
-              })
-            ],
-            imageObject: [],
-          }),
-        )
+        const bridgeStatus = await ensureStartupContainer(bridge)
+
+        switch(bridgeStatus) {
+          case 1:
+            console.debug('AppGlasses: Invalid parameters error on startup')
+            ctxRef.current.exitApp()
+            return;
+          case 2: 
+            console.debug('AppGlasses: Oversize error on startup')
+            ctxRef.current.exitApp()
+            return;
+          case 3:
+            console.debug('App Glasses: Out of memory error on startup')
+            ctxRef.current.exitApp()
+            return;
+          default:
+        }
+
         console.debug('AppGlasses: Created Startup Container')
 
 
-        unsubscribe = bridge.onEvenHubEvent((event) => {
+        unsubscribeRef.current = bridge.onEvenHubEvent((event) => {
           const tappedIndex = event?.listEvent?.currentSelectItemIndex ?? 0
           if (typeof tappedIndex === 'number' && Number.isFinite(tappedIndex)) {
             navRef.current = { ...navRef.current, highlightedIndex: tappedIndex }
@@ -364,6 +455,10 @@ export function AppGlasses() {
 
           const mapped = mapGlassEvent(event)
           if (mapped) dispatchAction(mapped)
+          
+          if(event?.sysEvent?.eventType == OsEventTypeList.SYSTEM_EXIT_EVENT) {
+            resetApp()
+          }
         })
 
         // unbindKeyboard = bindKeyboard(dispatchAction)
@@ -378,11 +473,14 @@ export function AppGlasses() {
       }
     })()
 
+    // Runs when unmounted
     return () => {
       disposed = true
-      unsubscribe?.()
+      unsubscribeRef.current?.()
+      unsubscribeRef.current = null
       bridgeRef.current = null
       deactivateKeepAlive()
+      resetApp()
     }
   }, [])
 

@@ -21,6 +21,7 @@ type NovelAction =
     | { type: 'SET_CHAPTERS', selectedChapterList: ChapterContent[]}
     | { type: 'SET_CHAPTER_INDEX', selectedChapterIndex: number}
     | { type: 'SET_CHAPTER_OFFSET', selectedChapterOffset: number}
+    | { type: 'CLEAR'}
 
 // --- Context Value ---
 interface NovelContextValue {
@@ -38,6 +39,7 @@ interface NovelContextValue {
     setPosition: (chapterOffset: number) => Promise<void>
     setChapterList: (chapters: ChapterContent[]) => void
     setChapter: (chapterIndex: number) => void
+    clearState: () => void
 }
 const NovelContext = createContext<NovelContextValue | null>(null) 
 
@@ -60,6 +62,14 @@ export function novelReducer(state: NovelState, action: NovelAction): NovelState
             return {...state, selectedChapterIndex: action.selectedChapterIndex}
         case 'SET_CHAPTER_OFFSET':
             return {...state, selectedChapterOffset: action.selectedChapterOffset}
+        case 'CLEAR':
+            return {
+                novels: state.novels,
+                selectedNovel: null,
+                selectedChapterList: [],
+                selectedChapterIndex: -1,
+                selectedChapterOffset: 0
+            }
         default:
             return state
     }
@@ -144,10 +154,18 @@ export function NovelProvider({children}: {children: ReactNode}) {
         },
         updatePosition: async (chapterPos) => {
             if(state.selectedNovel) {
-                state.selectedNovel.lastPosition = chapterPos
-                state.selectedNovel.lastReadAt = new Date().toISOString()
+                const updatedNovel: Novel = {
+                    ...state.selectedNovel,
+                    lastPosition: chapterPos,
+                    lastReadAt: new Date().toISOString(),
+                }
+
+                dispatch({ type: 'UPDATE', novel: updatedNovel })
+                dispatch({ type: 'SET_SELECTED', selectedNovel: updatedNovel })
+
                 try {
-                    await saveNovel(state.selectedNovel)
+                    // Position updates should persist metadata only; avoid re-writing large EPUB chunks.
+                    await saveNovel({ ...updatedNovel, epubBlob: undefined })
                 } catch (e) {
                     console.error('saveNovel failed', e)
                     throw e
@@ -157,6 +175,9 @@ export function NovelProvider({children}: {children: ReactNode}) {
         setPosition: async (chapterOffset) => {
             dispatch({ type: 'SET_CHAPTER_OFFSET', selectedChapterOffset: chapterOffset})
         },
+        clearState: async () => {
+            dispatch({ type: 'CLEAR'})
+        }
     }
 
     return <NovelContext.Provider value={value}>{children}</NovelContext.Provider>

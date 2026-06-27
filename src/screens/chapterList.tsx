@@ -20,17 +20,35 @@ export function ChapterList() {
     const [showToast, setShowToast] = useState(false)
 
     useEffect(() => {
-        if(selectedNovel?.lastPosition) {
-            setRenderedChapterList([{
-                name: "Continue at: " + selectedChapterList[selectedNovel.lastPosition.chapterIndex].name,
+        if (!selectedNovel?.lastPosition) return
+        if (!selectedChapterList.length) return
+
+        const continueIndex = selectedNovel.lastPosition.chapterIndex
+        if (continueIndex < 0 || continueIndex >= selectedChapterList.length) {
+            return
+        }
+
+        const continueChapter = selectedChapterList[continueIndex]
+        if (!continueChapter) return
+
+        setRenderedChapterList([
+            {
+                name: "Continue at: " + continueChapter.name,
                 chapterIndex: -1,
                 chapterPath: ""
-            }, ...selectedChapterList])
-        }
-    }, [selectedNovel?.lastPosition])
+            },
+            ...selectedChapterList,
+        ])
+    }, [selectedNovel?.lastPosition, selectedChapterList])
 
     useEffect(() => {
-        if (!selectedNovel?.epubBlob) return
+        if (!selectedNovel?.epubBlob) {
+            
+            setToastMessage("Failed to load chapters!")
+            setShowToast(true)
+            setTimeout(() => {setShowToast(false)}, 2000)
+            return
+        }
 
         const load = async () => {
             try {
@@ -52,6 +70,9 @@ export function ChapterList() {
                 console.error('Failed to load chapters', e)
                 setFailed(true)
             }
+            setToastMessage("Sucessfully loaded chapters!")
+            setShowToast(true)
+            setTimeout(() => {setShowToast(false)}, 2000)
         }
 
         void load()
@@ -63,15 +84,16 @@ export function ChapterList() {
                 
                 // Condition where "Continue" was pressed
                 if(index == -1 && selectedNovel && selectedNovel.lastPosition) {
-                    setChapter(selectedNovel.lastPosition.chapterIndex)
                     await setPosition(selectedNovel.lastPosition.charOffset)
+                    await setChapter(selectedNovel.lastPosition.chapterIndex)
                 } else {
-                    setChapter(index)
                     await setPosition(0)
                     updatePosition({
                         chapterIndex: index,
                         charOffset: 0
                     })
+                    await setChapter(index)
+
                 }
                 navigate("/chapter")
             } catch {
