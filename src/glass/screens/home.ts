@@ -1,118 +1,140 @@
-import { moveHighlight } from 'even-toolkit/glass-nav'
-import type { AppSnapshot, AppActions } from '../shared'
-import { RebuildPageContainer, ListContainerProperty, ListItemContainerProperty, TextContainerProperty } from '@evenrealities/even_hub_sdk'
-import { DISPLAY_W, DISPLAY_H } from 'even-toolkit/layout'
-import { truncateLabel, MAX_NOVEL_LIST_LENGTH  } from '../shared'
+import { moveHighlight } from "even-toolkit/glass-nav";
+import type { AppSnapshot, AppActions } from "../shared";
+import {
+  RebuildPageContainer,
+  ListContainerProperty,
+  ListItemContainerProperty,
+  TextContainerProperty,
+} from "@evenrealities/even_hub_sdk";
+import { DISPLAY_W, DISPLAY_H } from "even-toolkit/layout";
+import { truncateLabel, MAX_NOVEL_LIST_LENGTH } from "../shared";
 
-const MAX_BUTTON_LABEL_LENGTH = 60
+const MAX_BUTTON_LABEL_LENGTH = 60;
 
 export const homeScreen: any = {
   display(snapshot: AppSnapshot, nav: any) {
-    return buildHomeRebuildContainer(snapshot, nav)
+    return buildHomeRebuildContainer(snapshot, nav);
   },
 
   action(action: any, nav: any, snapshot: AppSnapshot, ctx: AppActions) {
+    if (!snapshot) return nav;
 
-    if(!snapshot)
-      return nav
+    if (!snapshot.buttons) return nav;
 
-    if(!snapshot.buttons)
-      return nav
+    let prevFlag = nav.startIndex > 0;
+    let nextFlag =
+      snapshot.buttons.length / MAX_NOVEL_LIST_LENGTH > nav.startIndex + 1;
 
-    let prevFlag = nav.startIndex > 0
-    let nextFlag = (snapshot.buttons.length / MAX_NOVEL_LIST_LENGTH) > (nav.startIndex + 1)
-    
-    if (action.type === 'HIGHLIGHT_MOVE') {
-      const maxHighlightIndex = Math.max(MAX_NOVEL_LIST_LENGTH - 1 + (prevFlag ? 1 : 0) + (nextFlag ? 1 : 0), 0)
+    if (action.type === "HIGHLIGHT_MOVE") {
+      const maxHighlightIndex = Math.max(
+        MAX_NOVEL_LIST_LENGTH - 1 + (prevFlag ? 1 : 0) + (nextFlag ? 1 : 0),
+        0,
+      );
 
       return {
         ...nav,
-        highlightedIndex: moveHighlight(nav.highlightedIndex, action.direction, maxHighlightIndex),
-      }
+        highlightedIndex: moveHighlight(
+          nav.highlightedIndex,
+          action.direction,
+          maxHighlightIndex,
+        ),
+      };
     }
 
-    if (action.type === 'SELECT_HIGHLIGHTED') { 
-      if(prevFlag && nav.highlightedIndex == 0)
+    if (action.type === "SELECT_HIGHLIGHTED") {
+      if (prevFlag && nav.highlightedIndex == 0)
         return {
           ...nav,
-          startIndex: nav.startIndex - 1
-        }
+          startIndex: nav.startIndex - 1,
+        };
 
-      if(nextFlag && nav.highlightedIndex == MAX_NOVEL_LIST_LENGTH + (prevFlag ? 1 : 0))
+      if (
+        nextFlag &&
+        nav.highlightedIndex == MAX_NOVEL_LIST_LENGTH + (prevFlag ? 1 : 0)
+      )
         return {
           ...nav,
-          startIndex: nav.startIndex + 1
-        }
+          startIndex: nav.startIndex + 1,
+        };
 
-      const selected = snapshot?.buttons?.[(nav.startIndex * MAX_NOVEL_LIST_LENGTH) + nav.highlightedIndex - (prevFlag ? 1 : 0)]
+      const selected =
+        snapshot?.buttons?.[
+          nav.startIndex * MAX_NOVEL_LIST_LENGTH +
+            nav.highlightedIndex -
+            (prevFlag ? 1 : 0)
+        ];
       if (!selected) {
-        return nav
+        return nav;
       }
       void ctx.selectNovel(selected.index).then(async () => {
-        await ctx.checkLoadedChapters()
-        ctx.navigate(selected.target)
-      })
+        await ctx.checkLoadedChapters();
+        ctx.navigate(selected.target);
+      });
     }
 
-    
-    if (action.type === 'GO_BACK') { // Exits application
-      ctx.exitApp()
+    if (action.type === "GO_BACK") {
+      // Exits application
+      ctx.exitApp();
     }
 
-    return nav
+    return nav;
   },
-}
+};
 
-export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, containerID = 1) {
-  const buttons = snapshot?.buttons ?? []
-  
-  const navIndex = nav.startIndex ?? 0
-  let prevFlag = nav.startIndex > 0
-  let nextFlag = (buttons.length / MAX_NOVEL_LIST_LENGTH) > (nav.startIndex + 1)
+export function buildHomeRebuildContainer(
+  snapshot: AppSnapshot,
+  nav: any,
+  containerID = 1,
+) {
+  const buttons = snapshot?.buttons ?? [];
+
+  const navIndex = nav.startIndex ?? 0;
+  let prevFlag = nav.startIndex > 0;
+  let nextFlag = buttons.length / MAX_NOVEL_LIST_LENGTH > nav.startIndex + 1;
 
   let names = buttons
-    .slice(MAX_NOVEL_LIST_LENGTH*navIndex, MAX_NOVEL_LIST_LENGTH*(navIndex+1))
-    .map((b) => truncateLabel(String(b.label ?? ''), MAX_BUTTON_LABEL_LENGTH))
+    .slice(
+      MAX_NOVEL_LIST_LENGTH * navIndex,
+      MAX_NOVEL_LIST_LENGTH * (navIndex + 1),
+    )
+    .map((b) => truncateLabel(String(b.label ?? ""), MAX_BUTTON_LABEL_LENGTH));
 
-  if(prevFlag) {
-    names = ["[ Previous Page ] ", ...names]
+  if (prevFlag) {
+    names = ["[ Previous Page ] ", ...names];
   }
 
-  if(nextFlag)
-    names = [...names, "[ Next Page ]"]
-  
-  
-  const header = 'Pick Your Novel'
-  const noNovel = 'Add a novel on the phone to get started!'
+  if (nextFlag) names = [...names, "[ Next Page ]"];
+
+  const header = "Pick Your Novel";
+  const noNovel = "Add a novel on the phone to get started!";
 
   let text = [
     new TextContainerProperty({
-      xPosition: DISPLAY_W/2 - header.length*5,
+      xPosition: DISPLAY_W / 2 - header.length * 5,
       yPosition: 0,
-      width: header.length*10,
+      width: header.length * 10,
       height: 30,
       containerID: 5,
-      containerName: 'home-title',
+      containerName: "home-title",
 
       content: header,
-      isEventCapture: 0
-    })
-  ]
+      isEventCapture: 0,
+    }),
+  ];
 
-  if(names.length === 0)
+  if (names.length === 0)
     text.push(
       new TextContainerProperty({
-        xPosition: DISPLAY_W/2 - noNovel.length*5,
+        xPosition: DISPLAY_W / 2 - noNovel.length * 5,
         yPosition: 70,
-        width: noNovel.length*10,
+        width: noNovel.length * 10,
         height: 30,
         containerID: 7,
-        containerName: 'home-no-novel',
+        containerName: "home-no-novel",
         content: noNovel,
-        isEventCapture: 0
-      })
-    )
-
+        isEventCapture: 0,
+      }),
+    );
 
   const list = new ListContainerProperty({
     xPosition: 10,
@@ -120,7 +142,7 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
     width: DISPLAY_W - 20,
     height: Math.min(DISPLAY_H - 70, names.length * 40),
     containerID,
-    containerName: 'home-list',
+    containerName: "home-list",
     itemContainer: new ListItemContainerProperty({
       itemCount: names.length,
       itemWidth: 0,
@@ -128,12 +150,12 @@ export function buildHomeRebuildContainer(snapshot: AppSnapshot, nav: any, conta
       itemName: names,
     }),
     isEventCapture: 1,
-  })
+  });
 
   return new RebuildPageContainer({
     containerTotalNum: 3,
     listObject: names.length === 0 ? [] : [list],
     textObject: text,
     imageObject: [],
-  })
+  });
 }

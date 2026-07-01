@@ -32,7 +32,8 @@
   --font-mono: var(--font-mono);
 }
 
-html, body {
+html,
+body {
   background: var(--color-bg);
   color: var(--color-text);
   min-height: 100dvh;
@@ -53,66 +54,73 @@ html, body {
   display: none;
 }
 
-h1 { /* Very Large Title */
+h1 {
+  /* Very Large Title */
   font-style: normal;
-  font-family: 'FK Grotesk', sans-serif;
+  font-family: "FK Grotesk", sans-serif;
   font-weight: 400;
   font-size: 24px;
   letter-spacing: -0.72px;
 }
 
-h2 { /* Large Title */
+h2 {
+  /* Large Title */
   font-style: normal;
-  font-family: 'FK Grotesk', sans-serif;
+  font-family: "FK Grotesk", sans-serif;
   font-weight: 400;
   font-size: 20px;
   letter-spacing: -0.6px;
 }
 
-
-h3 { /* Medium Title */
+h3 {
+  /* Medium Title */
   font-style: normal;
-  font-family: 'FK Grotesk', sans-serif;
+  font-family: "FK Grotesk", sans-serif;
   font-weight: 400;
   font-size: 17px;
   letter-spacing: -0.17px;
 }
 
-.medium-body { /* Medium Body*/
+.medium-body {
+  /* Medium Body*/
   font-style: normal;
-  font-family: 'FK Grotesk', sans-serif;
+  font-family: "FK Grotesk", sans-serif;
   font-weight: 300;
   font-size: 17px;
   letter-spacing: -0.17px;
 }
 
-h4 { /* Normal Title */
+h4 {
+  /* Normal Title */
   font-style: normal;
-  font-family: 'FK Grotesk', sans-serif;
+  font-family: "FK Grotesk", sans-serif;
   font-weight: 400;
   font-size: 15px;
   letter-spacing: -0.15px;
 }
 
-.normal-body { /* Normal Body*/
+.normal-body {
+  /* Normal Body*/
   font-style: normal;
-  font-family: 'FK Grotesk', sans-serif;
+  font-family: "FK Grotesk", sans-serif;
   font-weight: 300;
   font-size: 15px;
   letter-spacing: -0.15px;
 }
 
-h4 { /* Normal Subtitle */
+h4 {
+  /* Normal Subtitle */
   font-style: normal;
-  font-family: 'FK Grotesk', sans-serif;
+  font-family: "FK Grotesk", sans-serif;
   font-weight: 400;
   font-size: 13px;
   letter-spacing: -0.13px;
 }
 
-h5 { /* Normal Detail */
+h5 {
+  /* Normal Detail */
   font-style: normal;
-  font-family: 'FK Grotesk', sans-serif;
+  font-family: "FK Grotesk", sans-serif;
   font-weight: 400;
   font-size: 11px;
   letter-spacing: -0.11px;
@@ -120,10 +128,22 @@ h5 { /* Normal Detail */
 
 @keyframes slide-toast {
   /* 1.6s total -> .3/.3/.3 relative percentages */
-  0%   { bottom: -5rem; opacity: 1; }
-  18.75% { bottom: 1.25rem; opacity: 1; }   /* 0.3s / 1.6s = 18.75% */
-  81.25% { bottom: 1.25rem; opacity: 1; }   /* stay for 1.0s */
-  100% { bottom: -5rem; opacity: 1; }       /* last 0.3s */
+  0% {
+    bottom: -5rem;
+    opacity: 1;
+  }
+  18.75% {
+    bottom: 1.25rem;
+    opacity: 1;
+  } /* 0.3s / 1.6s = 18.75% */
+  81.25% {
+    bottom: 1.25rem;
+    opacity: 1;
+  } /* stay for 1.0s */
+  100% {
+    bottom: -5rem;
+    opacity: 1;
+  } /* last 0.3s */
 }
 
 .toast-anim {

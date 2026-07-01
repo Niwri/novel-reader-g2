@@ -1,133 +1,152 @@
-import { storageGet, storageSet } from 'even-toolkit/storage'
-import type { Novel, ChapterContent } from '../types/novelTypes.ts'
-import JSZip from 'jszip'
+import { storageGet, storageSet } from "even-toolkit/storage";
+import type { Novel, ChapterContent } from "../types/novelTypes.ts";
+import JSZip from "jszip";
 
-const STORAGE_KEY_NOVELS = 'novel-reader:novels'
+const STORAGE_KEY_NOVELS = "novel-reader:novels";
 
 export async function loadNovels(): Promise<Novel[]> {
-    const novels = await storageGet<Novel[] | null>(STORAGE_KEY_NOVELS, null)
-    return novels ?? []
+  const novels = await storageGet<Novel[] | null>(STORAGE_KEY_NOVELS, null);
+  return novels ?? [];
 }
 
 export async function saveNovels(novels: Novel[]): Promise<void> {
-    await storageSet(STORAGE_KEY_NOVELS, novels)
+  await storageSet(STORAGE_KEY_NOVELS, novels);
 }
 
-export async function getChapterList(file: Blob | File): Promise<ChapterContent[]> {
-    const zip = await JSZip.loadAsync(file);
+export async function getChapterList(
+  file: Blob | File,
+): Promise<ChapterContent[]> {
+  const zip = await JSZip.loadAsync(file);
 
-    const containerFile = zip.file("META-INF/container.xml");
-    if (!containerFile) throw new Error("Invalid EPUB: missing container.xml");
-    
-    const container = await containerFile.async("string");
-    const containerDoc = new DOMParser().parseFromString(container, "text/xml");
-    const opfPath = containerDoc.querySelector("rootfile")?.getAttribute("full-path");
-    if (!opfPath) throw new Error("Invalid EPUB: missing rootfile path");
+  const containerFile = zip.file("META-INF/container.xml");
+  if (!containerFile) throw new Error("Invalid EPUB: missing container.xml");
 
-    const opfFile = zip.file(opfPath);
-    if (!opfFile) throw new Error(`Invalid EPUB: missing OPF file at ${opfPath}`);
+  const container = await containerFile.async("string");
+  const containerDoc = new DOMParser().parseFromString(container, "text/xml");
+  const opfPath = containerDoc
+    .querySelector("rootfile")
+    ?.getAttribute("full-path");
+  if (!opfPath) throw new Error("Invalid EPUB: missing rootfile path");
 
-    const opf = await opfFile.async("string");
-    const opfDoc = new DOMParser().parseFromString(opf, "text/xml");
+  const opfFile = zip.file(opfPath);
+  if (!opfFile) throw new Error(`Invalid EPUB: missing OPF file at ${opfPath}`);
 
-    let tocEl = opfDoc.querySelector('manifest > item[properties~="nav"]') ||
-                opfDoc.querySelector('manifest > item[media-type="application/x-dtbncx+xml"]');
-    const tocPath = tocEl?.getAttribute("href") ?? null
+  const opf = await opfFile.async("string");
+  const opfDoc = new DOMParser().parseFromString(opf, "text/xml");
 
-    let chapterList: ChapterContent[] = []
-    
-    if(tocPath != null) {
-        
-        const opfDir = opfPath.includes("/")
-            ? opfPath.slice(0, opfPath.lastIndexOf("/") + 1)
-            : ""
-        const tocFile = zip.file(opfDir + tocPath);
-        if (!tocFile) throw new Error("Invalid EPUB: missing container.xml");
+  let tocEl =
+    opfDoc.querySelector('manifest > item[properties~="nav"]') ||
+    opfDoc.querySelector(
+      'manifest > item[media-type="application/x-dtbncx+xml"]',
+    );
+  const tocPath = tocEl?.getAttribute("href") ?? null;
 
-        const toc = await tocFile.async("string");
-        const tocDoc = new DOMParser().parseFromString(toc, "text/xml");
-        const chapterPointsEl = tocDoc.getElementsByTagName("navPoint");
+  let chapterList: ChapterContent[] = [];
 
-        let index = 0
-        for (const chapterNavPoint of Array.from(chapterPointsEl)) {
-            const title = chapterNavPoint.querySelector('navLabel > text')?.textContent?.trim()
-            const chapterPath = opfDir + chapterNavPoint.querySelector('content')?.getAttribute('src')
-            chapterList.push({
-                name: title ?? "Chapter " + index,
-                chapterIndex: index,
-                chapterPath: chapterPath
-            })
-            index += 1
-        }   
+  if (tocPath != null) {
+    const opfDir = opfPath.includes("/")
+      ? opfPath.slice(0, opfPath.lastIndexOf("/") + 1)
+      : "";
+    const tocFile = zip.file(opfDir + tocPath);
+    if (!tocFile) throw new Error("Invalid EPUB: missing container.xml");
+
+    const toc = await tocFile.async("string");
+    const tocDoc = new DOMParser().parseFromString(toc, "text/xml");
+    const chapterPointsEl = tocDoc.getElementsByTagName("navPoint");
+
+    let index = 0;
+    for (const chapterNavPoint of Array.from(chapterPointsEl)) {
+      const title = chapterNavPoint
+        .querySelector("navLabel > text")
+        ?.textContent?.trim();
+      const chapterPath =
+        opfDir + chapterNavPoint.querySelector("content")?.getAttribute("src");
+      chapterList.push({
+        name: title ?? "Chapter " + index,
+        chapterIndex: index,
+        chapterPath: chapterPath,
+      });
+      index += 1;
     }
+  }
 
-    return chapterList
+  return chapterList;
 }
 
-export async function extractChapterContentsFromBlob(epubBlob: Blob, filePath: string, blacklist: string[]): Promise<string[]> {
+export async function extractChapterContentsFromBlob(
+  epubBlob: Blob,
+  filePath: string,
+  blacklist: string[],
+): Promise<string[]> {
   try {
-    const zip = await JSZip.loadAsync(epubBlob)
+    const zip = await JSZip.loadAsync(epubBlob);
 
     // Try exact path first, then fallback to matching by suffix
-    let candidate: any = zip.file(filePath as any)
-    if (Array.isArray(candidate)) candidate = candidate[0]
+    let candidate: any = zip.file(filePath as any);
+    if (Array.isArray(candidate)) candidate = candidate[0];
     if (!candidate) {
-      candidate = (zip.file(new RegExp(filePath.replace(/^[./]+/, '') + '$') as any) as any)
-      if (Array.isArray(candidate)) candidate = candidate[0]
+      candidate = zip.file(
+        new RegExp(filePath.replace(/^[./]+/, "") + "$") as any,
+      ) as any;
+      if (Array.isArray(candidate)) candidate = candidate[0];
     }
 
     if (!candidate) {
-      const basename = filePath.split('/').pop() || filePath
-      const bySuffix: any = zip.file(new RegExp(basename + '$') as any)
-      candidate = Array.isArray(bySuffix) ? bySuffix[0] : bySuffix
+      const basename = filePath.split("/").pop() || filePath;
+      const bySuffix: any = zip.file(new RegExp(basename + "$") as any);
+      candidate = Array.isArray(bySuffix) ? bySuffix[0] : bySuffix;
     }
 
-    if (!candidate) return []
+    if (!candidate) return [];
 
-    const content = await candidate.async('string')
+    const content = await candidate.async("string");
 
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(content, 'application/xhtml+xml')
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, "application/xhtml+xml");
 
     // Only take elements with no children, only text.
-    const candidateBlocks = Array.from(doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div'))
+    const candidateBlocks = Array.from(
+      doc.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li, div"),
+    );
     const blocks = candidateBlocks.filter((el) => {
-      if (el.childElementCount > 0) return false
+      if (el.childElementCount > 0) return false;
       const hasDirectText = Array.from(el.childNodes).some(
-        (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim().length > 0,
-      )
-      return hasDirectText
-    })
+        (node) =>
+          node.nodeType === Node.TEXT_NODE &&
+          (node.textContent ?? "").trim().length > 0,
+      );
+      return hasDirectText;
+    });
 
     if (blocks.length > 0) {
       return blocks
-        .map((el) => el.textContent || '')
-        .map((t) => t.replace(/\s+/g, ' ').trim())
+        .map((el) => el.textContent || "")
+        .map((t) => t.replace(/\s+/g, " ").trim())
         .filter(Boolean)
-        .filter((t) => t.replaceAll('\n', '').length > 0)
+        .filter((t) => t.replaceAll("\n", "").length > 0)
         .filter((t) => !blacklist.includes(t))
-        .map((t) => t + '\n')
+        .map((t) => t + "\n");
     }
 
     // If above case fails, take text regardless of if it has children. (Danger!)
     if (candidateBlocks.length > 0) {
       return candidateBlocks
-        .map((el) => el.textContent || '')
-        .map((t) => t.replace(/\s+/g, ' ').trim())
+        .map((el) => el.textContent || "")
+        .map((t) => t.replace(/\s+/g, " ").trim())
         .filter(Boolean)
-        .filter((t) => t.replaceAll('\n', '').length > 0)
+        .filter((t) => t.replaceAll("\n", "").length > 0)
         .filter((t) => !blacklist.includes(t))
-        .map((t) => t + '\n')
+        .map((t) => t + "\n");
     }
 
     // Fallback: use body innerText split by newlines
-    const bodyText = doc.body?.textContent ?? ''
+    const bodyText = doc.body?.textContent ?? "";
     return bodyText
       .split(/\r?\n/)
-      .map((t) => t.replace(/\s+/g, ' ').trim())
-      .filter(Boolean)
+      .map((t) => t.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
   } catch (err) {
-    console.error('extractChapterContentsFromBlob error', err)
-    return []
+    console.error("extractChapterContentsFromBlob error", err);
+    return [];
   }
 }
